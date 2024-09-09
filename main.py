@@ -11,8 +11,6 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
-
-
 client_secret = os.getenv("CLIENT_SECRET_BFTD")
 client_ID = os.getenv("CLIENT_ID_BFTD")
 
