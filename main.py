@@ -14,22 +14,29 @@ load_dotenv()
 client_secret = os.getenv("CLIENT_SECRET_BFTD")
 client_ID = os.getenv("CLIENT_ID_BFTD")
 
+#
+BROADCASTER_ID = os.getenv("BROADCASTER_ID")
+MODERATOR_ID = os.getenv("MODERATOR_ID")
+
 # I'm using my non-default browser here, because the default will log me in instead of my bot.
 OPERA_PATH = os.getenv("OPERA_PATH")
 
-USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT]
+USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT, AuthScope.MODERATOR_MANAGE_BANNED_USERS]
 TARGET_CHANNEL = "darkshoxx"
 
 ABORT = False
+# Path for Grandomizer Shenanigans
+INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
+BAD_TERMS = ["bestviewers","cheapviewer"]
+BAN_TIMEOUT = 20
 
 def test_for_best_viewers(message:str):
-    BEST_VIEWERS = "bestviewers"
     message_stripped = message.replace('"', "").replace("'", "").replace(" ", "")
     message_normalized = unidecode(message_stripped)
     message_for_comparsion = message_normalized.lower()
     message_trunc = message_for_comparsion[:11]
     print("truncated message:", message_trunc)
-    if(message_trunc==BEST_VIEWERS):
+    if(message_trunc in BAD_TERMS):
         return True
     return False
 
@@ -38,23 +45,27 @@ def test_for_bot(message):
     return contains_best_viewers
 
 async def begin_ban_countdown(message: ChatMessage):
-    await message.reply(f"Warning! You ({message.user.name}) will be bonked in 10 seconds!")
-    for i in range(10):
-        index = 10 - i
+    await message.reply(f"Warning! You ({message.user.name}) will be bonked in {BAN_TIMEOUT} seconds!")
+    for i in range(BAN_TIMEOUT):
+        index = BAN_TIMEOUT - i
         await asyncio.sleep(1)
         is_aborted = await get_abort()
         if (index < 4):
-            await message.reply(str(index)+ " BOP")
+            await message.reply(str(index)+ message.user.name + " BOP")
     await asyncio.sleep(1)
     if (is_aborted):
          await message.reply("Your Life was spared!")
     else:
         await message.reply("YOUR FATE WAS SEALED! BONK BOP")
+        if (message.first):
+            return message.user
 
-async def test_message_for_violations(message:ChatMessage) -> bool:
+async def test_message_for_violations(bot: Chat, message:ChatMessage) -> bool:
     is_bot = test_for_bot(message.text)
     if (is_bot):
-        await begin_ban_countdown(message)
+        to_ban = await begin_ban_countdown(message)
+        if (to_ban):
+            await bot.twitch.ban_user(BROADCASTER_ID, MODERATOR_ID, to_ban.id, "GET REKT")
         return True
     return False
 
@@ -64,11 +75,30 @@ async def on_ready(ready_event: EventData):
     print('Bot is ready for work, joining channels') 
     await ready_event.chat.join_room(TARGET_CHANNEL)
 
+async def test_message_for_skip(msg: ChatMessage):
+    if (msg.text.lower() =="skip"):
+        print("received SKIP")
+        write_to_file("Skip", INTERFACE)
+        await asyncio.sleep(1)
+        return True
+    return False
+
+def write_to_file(string: str, filename: str) -> None:
+    """Helper function to overwrite the text in a file that exists, or create
+    said file with that content
+    Args:
+        string (str): text to be written to file.
+        filename (str): string of path to file, or just filename.
+    Returns:
+        None"""
+    with open(filename, mode="w") as file_object:
+        file_object.write(string)
+
 async def test_message_for_abort(msg: ChatMessage):
     if (msg.text.lower() =="abort"):
         print("received ABORT")
         await set_abort(True)
-        await asyncio.sleep(10)
+        await asyncio.sleep(BAN_TIMEOUT)
         return True
     return False
 
@@ -81,8 +111,9 @@ async def get_abort():
     global ABORT
     return ABORT    
 
-async def on_message(msg: ChatMessage):
-    is_invalid = await test_message_for_violations(msg)
+async def on_message(bot:Chat, msg: ChatMessage):
+    is_invalid = await test_message_for_violations(bot, msg)
+    is_skip = await test_message_for_skip(msg)
     is_abort = await test_message_for_abort(msg)
     print("is abort:" + str(is_abort))
     if (is_abort):
@@ -107,7 +138,22 @@ def get_opera():
 
     webbrowser.register('opera', None,webbrowser.BackgroundBrowser(OPERA_PATH))
 
-    my_constructor = webbrowser.get("opera")
+    _ = webbrowser.get("opera")
+
+class InheritedBot(Chat):
+
+    async def on_message(self, msg):
+        is_invalid = await test_message_for_violations(self, msg)
+        is_skip = await test_message_for_skip(msg)
+        is_abort = await test_message_for_abort(msg)
+        print("is abort:" + str(is_abort))
+        if (is_abort):
+            print("ABORTED")
+            await set_abort(False)
+        if (not is_invalid):
+            print(f"in {msg.room.name}, {msg.user.name} said {msg.text}")
+        else:
+            print(f" {msg.user.name} Sent an NAUGHTY message in {msg.room.name} !")
 
 async def run():
     # Twitch Client (big Daddy)
@@ -120,15 +166,18 @@ async def run():
     await twitch.set_user_authentication(token, USER_SCOPE, refresh_token)
 
     # Chat Client (little Daddy)
-    chat = await Chat(twitch)
-
-
+    chat = await InheritedBot(twitch) #Chat(twitch)
+    
     # register the handlers for the events you want
+    # from functools import partial
+
+    # async def curried_on_message(twitch):
+    #     partial(on_message, twitch)
 
     # listen to when the bot is done starting up and ready to join channels
     chat.register_event(ChatEvent.READY, on_ready)
     # listen to chat messages
-    chat.register_event(ChatEvent.MESSAGE, on_message)    
+    chat.register_event(ChatEvent.MESSAGE, chat.on_message)    
 
 
     # you can directly register commands and their handlers, this will register the !reply command
