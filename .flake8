@@ -1,0 +1,20 @@
+max-line-length = 88
+extend-ignore =
+    # "Whitespace before ':'" - not PEP-8 compliant
+    E203,
+    # "Line too long (82 >= 79 characters)" - allow comments and strings to pass
+    E501,
+    # insecure use of hashlib (md5) and random
+    DUO130, DUO102
+per-file-ignores =
+    __init__.py:F401
+require-plugins =
+    dlint
+    flake8-2020
+    flake8-bugbear
+    flake8-builtins
+    flake8-comprehensions
+    flake8-deprecated
+    # flake8-variables-names
+    mccabe
+    pep8-naming
