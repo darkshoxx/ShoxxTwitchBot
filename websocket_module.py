@@ -82,7 +82,8 @@ async def play_me(index: int, scene_index: str, sleep_time=30):
         (item['sceneItemId'], item['sourceName'])
         for item in video_item_list
         ]
-    print("List of objects found:" + mylist)
+    print("List of objects found:")
+    print(mylist)
 
     the_call = ws.call(requests.SetSceneItemEnabled(
         sceneName=video_scene[0]['sceneName'],

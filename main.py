@@ -15,7 +15,8 @@ from twitchAPI.twitch import Twitch
 from twitchAPI.type import AuthScope, ChatEvent
 from unidecode import unidecode
 
-from pokemon import generate_answer_video, generate_question_video
+from pokemon import (generate_answer_video, generate_question_video,
+                     get_pokemon_type_list, poketypes)
 from websocket_module import (loom_song_dict, myst_song_dict, oot_song_dict,
                               play_me, poke_vid_dict, scene_dict,
                               shiv_song_dict)
@@ -303,8 +304,14 @@ async def test_message_for_pokemon(msg: ChatMessage):
     if "pokemon" in words or "Pokemon" in words:
         position = words.index("pokemon")
         if len(words) - 1 > position:
-            if len(words[position+1]) == 4:
-                if words[position+1][:3].lower() == "gen":
+            next_word = words[position+1]
+            if next_word in poketypes:
+                print(next_word)
+                poke_type_list = get_pokemon_type_list(next_word)
+                dex = random.sample(poke_type_list, 1)[0]
+                print(dex)
+            elif len(next_word) == 4:
+                if next_word[:3].lower() == "gen":
                     try:
                         generation = int(words[position+1][3:])
                         dex_min, dex_max = GEN_POKE_DICT[generation]
