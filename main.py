@@ -4,6 +4,7 @@ import os
 import random
 import socket
 import time
+import webbrowser
 from typing import List
 
 import win32.win32gui as gui
@@ -19,12 +20,15 @@ from pokemon import (generate_answer_video, generate_question_video,
                      get_pokemon_type_list, poketypes)
 from websocket_module import (loom_song_dict, myst_song_dict, oot_song_dict,
                               play_me, poke_vid_dict, scene_dict,
-                              shiv_song_dict)
+                              shiv_song_dict, toggle_webcam_active)
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 ENV = os.path.join(HERE, ".env")
 load_dotenv(ENV)
 
+SE_DASH = "https://streamelements.com/dashboard"
+MUSIC_REQUEST_WINDOW_URL = SE_DASH + "/mediarequest/general"
+SE_ACTIVITY_FEED_URL = SE_DASH + "/5e9a2c08f268f86e34384b19/activity/popout"
 
 SONG_DICTS = [
     oot_song_dict,
@@ -307,7 +311,7 @@ async def test_message_for_pokemon(msg: ChatMessage):
             next_word = words[position+1]
             if next_word in poketypes:
                 print(next_word)
-                poke_type_list = get_pokemon_type_list(next_word)
+                poke_type_list = await get_pokemon_type_list(next_word)
                 dex = random.sample(poke_type_list, 1)[0]
                 print(dex)
             elif len(next_word) == 4:
@@ -340,6 +344,22 @@ async def test_message_for_pokemon(msg: ChatMessage):
             )
 
 
+async def test_message_for_submission(msg: ChatMessage):
+    words = msg.text.split(" ")
+    if words[0] in ["!add", "add", "submit", "!submit", "queue", "!queue"]:
+        await msg.reply("No viewerlevels!")
+
+
+async def test_message_for_tom_scott(msg: ChatMessage):
+    words = msg.text.split(" ")
+    if words[0].lower() == "where":
+        await play_me(None, scene_dict["where"])
+    if words[0].lower() == "what":
+        await play_me(None, scene_dict["what"])
+    if "welcome" in words or words[0].lower() == "welcome":
+        await play_me(None, scene_dict["welcome"])
+
+
 class InheritedBot(Chat):
 
     COOLDOWN_DICT = {}
@@ -352,6 +372,8 @@ class InheritedBot(Chat):
         await test_message_for_song(msg)
         await test_message_for_music_hints(msg)
         await test_message_for_pokemon(msg)
+        await test_message_for_submission(msg)
+        await test_message_for_tom_scott(msg)
         print("is abort:" + str(is_abort))
         if (is_abort):
             print("ABORTED")
@@ -449,6 +471,13 @@ async def run():
     chat.register_command('reply', test_command)
 
     chat.start()
+    # Boot up tools
+    # toggle camera off and on
+    await toggle_webcam_active()
+    # start Songrequest browser
+    webbrowser.open(MUSIC_REQUEST_WINDOW_URL)
+    # start activity feed
+    webbrowser.open(SE_ACTIVITY_FEED_URL)
 
     try:
         input('press ENTER to stop\n')

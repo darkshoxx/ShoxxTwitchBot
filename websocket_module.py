@@ -6,6 +6,7 @@ https://github.com/vaexenc/ocarina
 
 import asyncio
 import os
+import random
 
 from dotenv import load_dotenv
 from obswebsocket import obsws, requests
@@ -63,8 +64,35 @@ scene_dict = {
     "oot": "7 1 5",
     "shiv": "7 1 7",
     "myst": "7 1 8",
-    "poke": "7 1 4"
+    "poke": "7 1 4",
+    "where": "7 131",
+    "what": "7 132",
+    "welcome": "7 133",
 }
+
+
+async def toggle_webcam_active():
+    # scenes = ws.call(requests.GetSceneList()).getScenes()
+    # facecam_scene = [
+    #     dicti
+    #     for dicti in scenes
+    #     if dicti['sceneName'][:5] == "5 MAI"
+    #     ]
+    # video_item_list = ws.call(
+    #     requests.GetSceneItemList(**facecam_scene[0])
+    #     ).getSceneItems()
+    # print(video_item_list)
+    press_call_once = ws.call(requests.PressInputPropertiesButton(
+        inputName="Olympus",
+        propertyName="activate"
+    ))
+    await asyncio.sleep(1)
+    press_call_twice = ws.call(requests.PressInputPropertiesButton(
+        inputName="Olympus",
+        propertyName="activate"
+    ))
+    print(press_call_once)
+    print(press_call_twice)
 
 
 async def play_me(index: int, scene_index: str, sleep_time=30):
@@ -84,6 +112,8 @@ async def play_me(index: int, scene_index: str, sleep_time=30):
         ]
     print("List of objects found:")
     print(mylist)
+    if not index:
+        index = random.sample([index for index, _ in mylist], 1)[0]
 
     the_call = ws.call(requests.SetSceneItemEnabled(
         sceneName=video_scene[0]['sceneName'],
@@ -107,4 +137,5 @@ async def play_me(index: int, scene_index: str, sleep_time=30):
         )
 
 if __name__ == "__main__":
-    asyncio.run(play_me(2, "7 1 5"))
+    # asyncio.run(play_me(2, "7 1 5"))
+    asyncio.run(toggle_webcam_active())
