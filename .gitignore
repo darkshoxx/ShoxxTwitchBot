@@ -3,6 +3,7 @@ scratch.py
 user_token.json
 output/
 pokelog.txt
+.pyslobs
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

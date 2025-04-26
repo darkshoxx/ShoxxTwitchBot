@@ -37,7 +37,7 @@ oot_song_dict = {
     "v><v><": 9,
     "Av>><": 10,
     "Av^Av^": 11,
-    ">Av><Av": 12,
+    ">Av>Av": 12,
     }
 
 loom_song_dict = {

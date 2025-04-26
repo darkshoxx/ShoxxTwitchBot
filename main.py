@@ -18,17 +18,32 @@ from unidecode import unidecode
 
 from pokemon import (generate_answer_video, generate_question_video,
                      get_pokemon_type_list, poketypes)
-from websocket_module import (loom_song_dict, myst_song_dict, oot_song_dict,
-                              play_me, poke_vid_dict, scene_dict,
-                              shiv_song_dict, toggle_webcam_active)
+
+STREAMING_SOFTWARE = "SLOBS"
+
+if STREAMING_SOFTWARE == "OBS":
+    from websocket_module import (loom_song_dict, myst_song_dict,
+                                  oot_song_dict, play_me, poke_vid_dict,
+                                  scene_dict, shiv_song_dict,
+                                  toggle_webcam_active)
+elif STREAMING_SOFTWARE == "SLOBS":
+    from websocket_module_SLOBS import (loom_song_dict, myst_song_dict,
+                                        oot_song_dict, play_me, poke_vid_dict,
+                                        scene_dict, shiv_song_dict,
+                                        toggle_webcam_active)
 
 HERE = os.path.abspath(os.path.dirname(__file__))
+BANFILE = os.path.join(HERE, "banned_terms.txt")
 ENV = os.path.join(HERE, ".env")
 load_dotenv(ENV)
 
 SE_DASH = "https://streamelements.com/dashboard"
 MUSIC_REQUEST_WINDOW_URL = SE_DASH + "/mediarequest/general"
 SE_ACTIVITY_FEED_URL = SE_DASH + "/5e9a2c08f268f86e34384b19/activity/popout"
+BACKUP_PLAYLIST = (
+    "https://www.youtube.com/" +
+    "watch?v=ugo6ASPVu9g&list=PL81qmzvK51I2odHo1sarrsWtOtHAQ1hag"
+    )
 
 SONG_DICTS = [
     oot_song_dict,
@@ -53,7 +68,6 @@ else:
 HOST = 'localhost'
 # The port used by the Processing server
 PORT = 5002
-
 BROADCASTER_ID = os.getenv("BROADCASTER_ID")
 MODERATOR_ID = os.getenv("MODERATOR_ID")
 
@@ -141,6 +155,12 @@ def get_half_handles(current_handle: List[int], direction: str) -> List[int]:
         else:
             got_a_new_window = False
     return half_handles_list
+
+
+TEST_MSGS = [
+    "Bͦest vie̟wers",
+    "Bͦest vie̟wers",
+]
 
 
 def test_for_best_viewers(message: str):
@@ -350,6 +370,23 @@ async def test_message_for_submission(msg: ChatMessage):
         await msg.reply("No viewerlevels!")
 
 
+async def test_message_for_banned_terms(bot: Chat, msg: ChatMessage):
+    words = msg.text.split(" ")
+    with open(BANFILE) as banned_terms_file:
+        content = banned_terms_file.read()
+        lines = content.split("\n")
+        print(lines)
+
+    for word in words:
+        if word in lines:
+            print(word)
+            await bot.twitch.delete_chat_message(
+                BROADCASTER_ID,
+                MODERATOR_ID,
+                msg.id
+                )
+
+
 async def test_message_for_tom_scott(msg: ChatMessage):
     words = msg.text.split(" ")
     if words[0].lower() == "where":
@@ -374,6 +411,7 @@ class InheritedBot(Chat):
         await test_message_for_pokemon(msg)
         await test_message_for_submission(msg)
         await test_message_for_tom_scott(msg)
+        # await test_message_for_banned_terms(self, msg)
         print("is abort:" + str(is_abort))
         if (is_abort):
             print("ABORTED")
@@ -474,10 +512,11 @@ async def run():
     # Boot up tools
     # toggle camera off and on
     await toggle_webcam_active()
-    # start Songrequest browser
-    webbrowser.open(MUSIC_REQUEST_WINDOW_URL)
     # start activity feed
     webbrowser.open(SE_ACTIVITY_FEED_URL)
+    # start Songrequest browser
+    # webbrowser.open(MUSIC_REQUEST_WINDOW_URL)
+    webbrowser.open(BACKUP_PLAYLIST)
 
     try:
         input('press ENTER to stop\n')
