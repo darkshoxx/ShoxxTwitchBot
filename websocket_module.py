@@ -28,21 +28,21 @@ ws.connect()
 oot_song_dict = {
     "<^><^>": 1,
     ">v^>v^": 2,
-    "vAvA>v>v": 3,
+    "vava>v>v": 3,
     "^<>^<>": 4,
-    "A^<><>": 5,
-    "<>>A<>v": 6,
+    "a^<><>": 5,
+    "<>>a<>v": 6,
     "^>^><^": 7,
-    "AvA>vA": 8,
+    "ava>va": 8,
     "v><v><": 9,
-    "Av>><": 10,
-    "Av^Av^": 11,
-    ">Av>Av": 12,
+    "av>><": 10,
+    "av^av^": 11,
+    ">av>av": 12,
     }
 
 loom_song_dict = {
     "eced": 1,
-    "Cfgc": 2
+    "cfgc": 2
 }
 
 shiv_song_dict = {
@@ -50,7 +50,7 @@ shiv_song_dict = {
 }
 
 myst_song_dict = {
-    "C1C2D#2F1A#0": 2
+    "c1c2d#2f1a#0": 2
 }
 
 poke_vid_dict = {
@@ -64,6 +64,7 @@ scene_dict = {
     "oot": "7 1 5",
     "shiv": "7 1 7",
     "myst": "7 1 8",
+    "outtake": "7 1 9",
     "poke": "7 1 4",
     "where": "7 131",
     "what": "7 132",
@@ -83,12 +84,12 @@ async def toggle_webcam_active():
     #     ).getSceneItems()
     # print(video_item_list)
     press_call_once = ws.call(requests.PressInputPropertiesButton(
-        inputName="Olympus",
+        inputName="BGRemoved Facecam",
         propertyName="activate"
     ))
     await asyncio.sleep(1)
     press_call_twice = ws.call(requests.PressInputPropertiesButton(
-        inputName="Olympus",
+        inputName="BGRemoved Facecam",
         propertyName="activate"
     ))
     print(press_call_once)

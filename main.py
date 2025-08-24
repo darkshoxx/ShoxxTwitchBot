@@ -19,7 +19,7 @@ from unidecode import unidecode
 from pokemon import (generate_answer_video, generate_question_video,
                      get_pokemon_type_list, poketypes)
 
-STREAMING_SOFTWARE = "SLOBS"
+STREAMING_SOFTWARE = "OBS"
 
 if STREAMING_SOFTWARE == "OBS":
     from websocket_module import (loom_song_dict, myst_song_dict,
@@ -290,14 +290,15 @@ def get_opera():
 
 
 async def test_message_for_song(msg: ChatMessage):
-    if msg.text in oot_song_dict.keys():
-        await play_me(oot_song_dict[msg.text], scene_dict["oot"])
-    elif msg.text in loom_song_dict.keys():
-        await play_me(loom_song_dict[msg.text], scene_dict["loom"])
-    elif msg.text in shiv_song_dict.keys():
-        await play_me(shiv_song_dict[msg.text], scene_dict["shiv"])
-    elif msg.text in myst_song_dict.keys():
-        await play_me(myst_song_dict[msg.text], scene_dict["myst"])
+    clean_text = msg.text.lower().replace(" ", "")
+    if clean_text in oot_song_dict.keys():
+        await play_me(oot_song_dict[clean_text], scene_dict["oot"])
+    elif clean_text in loom_song_dict.keys():
+        await play_me(loom_song_dict[clean_text], scene_dict["loom"])
+    elif clean_text in shiv_song_dict.keys():
+        await play_me(shiv_song_dict[clean_text], scene_dict["shiv"])
+    elif clean_text in myst_song_dict.keys():
+        await play_me(myst_song_dict[clean_text], scene_dict["myst"])
 
 
 GEN_POKE_DICT = {
@@ -397,6 +398,14 @@ async def test_message_for_tom_scott(msg: ChatMessage):
         await play_me(None, scene_dict["welcome"])
 
 
+async def test_message_for_outtake(msg: ChatMessage):
+    words = msg.text.split(" ")
+    if words[0].lower() == "outtake":
+        if msg.user.name.lower() == "darkshoxx":
+            print("Status: Outtake")
+            await play_me(None, scene_dict["outtake"])
+
+
 class InheritedBot(Chat):
 
     COOLDOWN_DICT = {}
@@ -411,6 +420,7 @@ class InheritedBot(Chat):
         await test_message_for_pokemon(msg)
         await test_message_for_submission(msg)
         await test_message_for_tom_scott(msg)
+        await test_message_for_outtake(msg)
         # await test_message_for_banned_terms(self, msg)
         print("is abort:" + str(is_abort))
         if (is_abort):
