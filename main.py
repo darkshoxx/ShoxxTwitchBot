@@ -54,7 +54,7 @@ SONG_DICTS = [
 
 MUSIC_HINTS = [key + "\n" for dicti in SONG_DICTS for key, _ in dicti.items()]
 MUSIC_HINTS = "".join(MUSIC_HINTS)
-BOT_ACCOUNT = "BFTD"  # BFTD / SHOXX
+BOT_ACCOUNT = "SHOXX"  # BFTD / SHOXX
 if BOT_ACCOUNT == "BFTD":
     client_secret = os.getenv("CLIENT_SECRET_BFTD")
     client_id = os.getenv("CLIENT_ID_BFTD")
@@ -67,9 +67,14 @@ else:
 # Replace with the IP address of your Processing server if necessary
 HOST = 'localhost'
 # The port used by the Processing server
-PORT = 5002
+PORT = 5003
 BROADCASTER_ID = os.getenv("BROADCASTER_ID")
-MODERATOR_ID = os.getenv("MODERATOR_ID")
+if BOT_ACCOUNT == "BFTD":
+    MODERATOR_ID = os.getenv("MODERATOR_ID")
+elif BOT_ACCOUNT == "SHOXX":
+    MODERATOR_ID = os.getenv("BROADCASTER_ID")
+else:
+    raise Exception("Invalid Bot Account")
 
 # I'm using my non-default browser here,
 # because the default will log me in instead of my bot.
@@ -89,9 +94,9 @@ INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
 
 POKE_LOG = os.path.join(HERE, "pokelog.txt")
 TOKEN_FILE = os.path.join(HERE, "user_token.json")
-BAD_TERMS = ["bestviewers", "cheapviewer"]
-BAN_TIMEOUT = 20
-
+BAD_TERMS = ["bestviewers", "cheapviewer", "cheapfollow", "bestfollowe"] # ALL TERMS HAVE 11 CHARACTERS
+BAN_TIMEOUT = 5
+auto_spin = False
 
 # Wheel section
 def put_wheel_in_foreground():
@@ -217,6 +222,16 @@ async def test_message_for_violations(bot: Chat, message: ChatMessage) -> bool:
     return False
 
 
+
+async def auto_spinner():
+    AUTO_SLEEP = 3*60
+    while True:
+        await asyncio.sleep(1)
+
+        if auto_spin:
+            send_spin()
+            await asyncio.sleep(AUTO_SLEEP)
+
 async def on_ready(ready_event: EventData):
     print('Bot is ready for work, joining channels')
     await ready_event.chat.join_room(TARGET_CHANNEL)
@@ -278,7 +293,7 @@ async def test_command(cmd: ChatCommand):
 def send_spin():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
-        s.sendall(b'Spin')
+        s.sendall(b'Spin Wheel of Ixupi')
 
 
 def get_opera():
@@ -407,13 +422,14 @@ async def test_message_for_outtake(msg: ChatMessage):
 
 
 class InheritedBot(Chat):
-
     COOLDOWN_DICT = {}
+    
 
     async def on_message(self, msg):
         is_invalid = await test_message_for_violations(self, msg)
         await test_message_for_skip(self, msg)
         await test_message_for_spin(self, msg)
+        await toggle_autospin(msg=msg)
         is_abort = await test_message_for_abort(msg)
         await test_message_for_song(msg)
         await test_message_for_music_hints(msg)
@@ -442,6 +458,23 @@ def kill_inactive_players(bot: InheritedBot):
             players_to_kill.append(player)
     for player in players_to_kill:
         bot.COOLDOWN_DICT.pop(player)
+
+
+
+async def toggle_autospin(msg: ChatMessage):
+    global auto_spin
+    if msg.user.name.lower() == "darkshoxx":
+        if msg.text.lower() == "auto":
+            if auto_spin:
+                await msg.reply(
+                    f"{msg.user.name} has turned off Autospin!"
+                    )
+            else:
+                await msg.reply(
+                    f"{msg.user.name} has turned on Autospin!"
+                    )
+            auto_spin = not auto_spin
+
 
 
 async def test_message_for_spin(bot: InheritedBot, msg: ChatMessage):
@@ -481,6 +514,7 @@ async def test_message_for_spin(bot: InheritedBot, msg: ChatMessage):
 
 
 async def run():
+    print("Is Running...")
     # Twitch Client (big Daddy)
     twitch = await Twitch(client_id, client_secret)
 
@@ -527,6 +561,8 @@ async def run():
     # start Songrequest browser
     # webbrowser.open(MUSIC_REQUEST_WINDOW_URL)
     webbrowser.open(BACKUP_PLAYLIST)
+
+    await auto_spinner()
 
     try:
         input('press ENTER to stop\n')
