@@ -3,6 +3,7 @@ import math
 import os
 import random
 import socket
+import threading
 import time
 import webbrowser
 from typing import List
@@ -18,6 +19,21 @@ from unidecode import unidecode
 
 from pokemon import (generate_answer_video, generate_question_video,
                      get_pokemon_type_list, poketypes)
+
+try:
+    import obspython as obs
+    IN_OBS = True
+except ImportError:
+    obs = None
+    IN_OBS = False
+
+if obs:
+    try:
+        obs.script_log(obs.LOG_INFO, "Import phase start")
+        import sys
+        obs.script_log(obs.LOG_INFO, f"Python exe: {sys.executable}")
+    except Exception as e:
+        obs.script_log(obs.LOG_ERROR, str(e))
 
 STREAMING_SOFTWARE = "OBS"
 
@@ -94,7 +110,8 @@ INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
 
 POKE_LOG = os.path.join(HERE, "pokelog.txt")
 TOKEN_FILE = os.path.join(HERE, "user_token.json")
-BAD_TERMS = ["bestviewers", "cheapviewer", "cheapfollow", "bestfollowe"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_TERMS_START = ["bestviewers", "cheapviewer", "cheapfollow", "bestfollowe"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers" "op58.online"] # ALL TERMS HAVE 11 CHARACTERS
 BAN_TIMEOUT = 5
 auto_spin = False
 
@@ -175,15 +192,19 @@ def test_for_best_viewers(message: str):
         )
     message_normalized = unidecode(message_stripped)
     message_for_comparsion = message_normalized.lower()
-    message_trunc = message_for_comparsion[:11]
-    print("truncated message:", message_trunc)
-    if (message_trunc in BAD_TERMS):
+    message_trunc_start = message_for_comparsion[:11]
+    message_trunc_end = message_for_comparsion[-11:]
+    print("truncated message:", message_trunc_start)
+    if (message_trunc_start in BAD_TERMS_START):
+        return True
+    if (message_trunc_end in BAD_TERMS_END):
         return True
     return False
 
 
 def test_for_bot(message):
     contains_best_viewers = test_for_best_viewers(message)
+
     return contains_best_viewers
 
 
@@ -223,14 +244,15 @@ async def test_message_for_violations(bot: Chat, message: ChatMessage) -> bool:
 
 
 
-async def auto_spinner():
-    AUTO_SLEEP = 3*60
-    while True:
-        await asyncio.sleep(1)
+async def auto_spinner(spin):
+    if spin:
+        AUTO_SLEEP = 3*60
+        while True:
+            await asyncio.sleep(1)
 
-        if auto_spin:
-            send_spin()
-            await asyncio.sleep(AUTO_SLEEP)
+            if auto_spin:
+                send_spin()
+                await asyncio.sleep(AUTO_SLEEP)
 
 async def on_ready(ready_event: EventData):
     print('Bot is ready for work, joining channels')
@@ -423,7 +445,7 @@ async def test_message_for_outtake(msg: ChatMessage):
 
 class InheritedBot(Chat):
     COOLDOWN_DICT = {}
-    
+
 
     async def on_message(self, msg):
         is_invalid = await test_message_for_violations(self, msg)
@@ -562,14 +584,54 @@ async def run():
     # webbrowser.open(MUSIC_REQUEST_WINDOW_URL)
     webbrowser.open(BACKUP_PLAYLIST)
 
-    await auto_spinner()
+
+    spin = False
+
+    await auto_spinner(spin)
 
     try:
-        input('press ENTER to stop\n')
+        if IN_OBS:
+
+            await stop_event.wait()
+        else:
+
+            input('press ENTER to stop\n')
     finally:
         # now we can close the chat bot and the twitch api client
         chat.stop()
         await twitch.close()
 
-if __name__ == "__main__":
+
+### OBS STARTUP INFRASTRUCTURE
+stop_event = asyncio.Event()
+bot_thread = None
+running = False
+
+
+def start_bot():
+    global bot_thread
+    if bot_thread and bot_thread.is_alive():
+        return
+    stop_event.clear()
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+
+def stop_bot():
+    if loop and loop.is_running():
+        loop.call_soon_threadsafe(stop_event.set)
+
+def run_bot():
+    global loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run())
+    loop.close()
+
+def script_load(settings):
+    start_bot()
+
+def script_unload():
+    stop_bot()
+
+if __name__ == "__main__" and not IN_OBS:
     asyncio.run(run())
