@@ -75,22 +75,32 @@
   }
 
   /* ── Corner accent: username badge ── */
+  /* ... keep existing position, transform, and font-family ... */
+  /* .name-badge {
+  } */
   .name-badge {
     position: absolute;
     bottom: 10px; left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(90deg, var(--purple-dim), var(--surface));
-    border: 1px solid var(--cyan);
-    box-shadow: var(--glow-cyan);
-    border-radius: var(--r-sm);
-    padding: 4px 14px;
-    font-family: var(--font-display);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: .12em;
-    color: var(--cyan);
-    text-transform: uppercase;
-    white-space: nowrap;
+    background: rgba(13, 15, 20, 0.95); 
+  /* background: linear-gradient(90deg, var(--purple-dim), var(--surface)); */
+  border: 2px solid #7c3aed; 
+  /* border: 1px solid var(--cyan); */
+  box-shadow: 0 0 12px rgba(0, 245, 255, 0.4); 
+  /* box-shadow: var(--glow-cyan); */
+  border-radius: var(--r-sm);
+  /* padding: 4px 14px; */
+  padding: 6px 20px;
+  font-family: var(--font-display);
+  /* font-size: 13px; */
+  font-size: 18px; 
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: #ffffff; 
+  /* color: var(--cyan); */
+  text-transform: uppercase;
+  text-shadow: 0 0 6px #00f5ff; 
+  white-space: nowrap;
   }
 
   /* ── Live indicator ── */

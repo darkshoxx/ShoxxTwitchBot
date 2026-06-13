@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Hex alpha mask for OBS Image Mask/Blend filter (400×400).
+  Hex alpha mask for OBS Image Mask/Blend filter (400ï¿½400).
   Matches the hex in overlays/webcam.html (#hexClip polygon).
 
-  OBS: filter type ’ "Alpha Channel (Alpha Mask)"
+  OBS: filter type ï¿½ "Alpha Channel (Alpha Mask)"
        opaque white = webcam visible, transparent = hidden
 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
