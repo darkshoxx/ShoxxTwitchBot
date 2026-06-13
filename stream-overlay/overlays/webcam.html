@@ -6,15 +6,30 @@
 <link rel="stylesheet" href="/css/tokens.css">
 <style>
   /*
-    OBS setup:
-      1. Add your webcam as a Video Capture Device source
-      2. Add this page as a Browser Source (same size as webcam, e.g. 400x400)
-      3. In OBS, place the Browser Source ABOVE the webcam
-      4. Enable "Shutdown source when not visible" + "Refresh browser when activated"
+    OBS setup (400×400 sources, browser above webcam):
 
-    The SVG clipPath masks a square capture; for a true hex mask on the
-    webcam itself, use OBS's built-in Image Mask/Blend filter with a
-    hex-shaped PNG (see README).
+    1. Video Capture Device
+       - Crop/resize to 400×400, position where you want the cam.
+
+    2. Filters on the webcam → Image Mask/Blend
+       - Type: Alpha Channel (Alpha Mask)
+       - Mask: stream-overlay/public/masks/webcam-hex-400.svg
+         (PNG works too if your OBS build rejects SVG — export this SVG at 400×400)
+       - Opacity: 100%, stretch/both checked if offered
+
+    3. Browser Source → http://localhost:3000/webcam  (or open overlays/webcam.html locally)
+       - Width/height: 400×400, same position as the webcam
+       - ✓ Shutdown source when not visible
+       - ✓ Refresh browser when scene becomes active
+       - Custom CSS (optional): body { background: transparent !important; }
+
+    4. Filters on the Browser Source → Chroma Key / Color Key
+       - Key color: #0d0f14  (the void fill outside the hex frame)
+       - Similarity: ~400–450, Smoothness: ~80–120, Key spill reduction: ~100
+       - This punches out the dark matte so the masked webcam shows through;
+         decorative strokes, rings, and badges stay visible.
+
+    Layer order (bottom → top): game → masked webcam → browser frame overlay
   */
 
   html, body {

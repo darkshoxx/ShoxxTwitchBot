@@ -53,8 +53,16 @@ const ctx    = canvas.getContext('2d');
 
 // ── Config ────────────────────────────────────────────────
 const CFG = {
-  hexSize:     38,       // radius of each hex
-  gap:          2,       // gap between hexes
+  hexSize:     38,       // circumradius (center → vertex); drives grid pitch AND draw size
+  gap:          2,       // extra px added to center-to-center pitch (visible space between hexes)
+  // ── hexRotationDeg ─────────────────────────────────────
+  // Extra rotation for every hex (degrees). Tessellation stays aligned only at multiples of 60.
+  //   0  — flat-top (default); matches the column stagger in the loop below.
+  //  30  — pointy-top; looks right but column stagger is wrong for a perfect honeycomb.
+  //  60  — same lattice as 0, just rotated; scroll wrap math still holds.
+  //  90  — flat-top again (equivalent lattice to 0/180).
+  //  15, 45, … — breaks tiling; fine if you want a loose / organic look.
+  hexRotationDeg: 0,
   scrollSpeedX: 0.18,   // px/frame rightward drift
   scrollSpeedY: 0.10,   // px/frame downward drift
   pulseSpeed:   0.008,  // glow pulse rate
@@ -84,9 +92,11 @@ window.addEventListener('resize', resize);
 resize();
 
 function hexPath(cx, cy, r) {
+  // Built-in -30° = flat-top; hexRotationDeg rotates the whole lattice on top of that.
+  const rot = Math.PI / 180 * (CFG.hexRotationDeg - 30);
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
-    const a = Math.PI / 180 * (60 * i - 30);
+    const a = rot + (Math.PI / 3) * i;
     const x = cx + r * Math.cos(a);
     const y = cy + r * Math.sin(a);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
@@ -126,7 +136,7 @@ function drawFrame() {
       const [r,g,b] = lerpColor(CFG.colorDim, lerpColor(CFG.colorA, CFG.colorB, wave), brightness * 0.85);
       const alpha = 0.3 + brightness * 0.55;
 
-      hexPath(cx, cy, CFG.hexSize - CFG.gap);
+      hexPath(cx, cy, CFG.hexSize);
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
       ctx.fill();
 

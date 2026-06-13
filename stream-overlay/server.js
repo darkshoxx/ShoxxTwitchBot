@@ -32,7 +32,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Overlay page routes ───────────────────────────────────
 const overlayDir = path.join(__dirname, 'overlays');
-const overlays = ['webcam', 'background', 'alerts', 'chat', 'hud'];
+const overlays = ['webcam', 'background', 'alerts', 'chat', 'hud', 'border-4x3', 'border-16x9'];
 overlays.forEach(name => {
   app.get(`/${name}`, (_req, res) =>
     res.sendFile(path.join(overlayDir, `${name}.html`))
@@ -88,6 +88,8 @@ server.listen(PORT, () => {
   console.log(`   Alerts:     http://localhost:${PORT}/alerts`);
   console.log(`   Chat:       http://localhost:${PORT}/chat`);
   console.log(`   HUD:        http://localhost:${PORT}/hud`);
+  console.log(`   16x9:       http://localhost:${PORT}/border-16x9`);
+  console.log(`   4x3:        http://localhost:${PORT}/border-4x3`);
   console.log(`\n   POST /event  to push alerts from the bot`);
   console.log(`   GET  /test/follow|sub|pokemon|spin|raid  for dev\n`);
 });

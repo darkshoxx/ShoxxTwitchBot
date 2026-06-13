@@ -1,0 +1,44 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>4:3 Game Border – darkshoxx</title>
+<style>
+  /* 1920x1080 Canvas */
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  /* 1080x810 Frame centered within the 1440px zone */
+  .game-frame {
+    position: absolute;
+    left: 180px;
+    top: 0;
+    width: 1080px;
+    height: 810px;
+    box-sizing: border-box;
+    
+    /* Styling updated for a freestanding box */
+    border-left: 2px solid #00f5ff;
+    border-right: 2px solid #00f5ff;
+    border-bottom: 2px solid #7c3aed;
+    border-top: 2px solid #7c3aed;
+    
+    /* Mirrored shadow for symmetry */
+    box-shadow: 
+      6px 6px 15px rgba(124, 58, 237, 0.2), 
+     -6px 6px 15px rgba(124, 58, 237, 0.2), 
+      inset 0px -2px 10px rgba(0, 245, 255, 0.1);
+  }
+</style>
+</head>
+<body>
+  <div class="game-frame"></div>
+</body>
+</html>
