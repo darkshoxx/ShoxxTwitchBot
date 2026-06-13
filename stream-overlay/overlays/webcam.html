@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Webcam Frame – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  /*
+    OBS setup:
+      1. Add your webcam as a Video Capture Device source
+      2. Add this page as a Browser Source (same size as webcam, e.g. 400x400)
+      3. In OBS, place the Browser Source ABOVE the webcam
+      4. Enable "Shutdown source when not visible" + "Refresh browser when activated"
+
+    The SVG clipPath masks a square capture; for a true hex mask on the
+    webcam itself, use OBS's built-in Image Mask/Blend filter with a
+    hex-shaped PNG (see README).
+  */
+
+  html, body {
+    width: 400px; height: 400px;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .frame-root {
+    position: relative;
+    width: 400px; height: 400px;
+  }
+
+  /* ── Hexagonal SVG frame ── */
+  svg.hex-frame {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    overflow: visible;
+  }
+
+  /* Spinning dashed ring */
+  .ring-spin {
+    transform-origin: 200px 200px;
+    animation: spinRing 12s linear infinite;
+  }
+  @keyframes spinRing {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Counter-spin inner ring */
+  .ring-counter {
+    transform-origin: 200px 200px;
+    animation: spinRing 8s linear infinite reverse;
+  }
+
+  /* Pulsing glow on the main hex border */
+  .hex-border {
+    animation: hexGlow 3s ease-in-out infinite alternate;
+  }
+  @keyframes hexGlow {
+    0%   { filter: drop-shadow(0 0 4px #7c3aed) drop-shadow(0 0 12px #7c3aed88); }
+    100% { filter: drop-shadow(0 0 8px #00f5ff) drop-shadow(0 0 20px #00f5ff88); }
+  }
+
+  /* ── Corner accent: username badge ── */
+  .name-badge {
+    position: absolute;
+    bottom: 10px; left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(90deg, var(--purple-dim), var(--surface));
+    border: 1px solid var(--cyan);
+    box-shadow: var(--glow-cyan);
+    border-radius: var(--r-sm);
+    padding: 4px 14px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ── Live indicator ── */
+  .live-dot {
+    position: absolute;
+    top: 22px; right: 22px;
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .15em;
+    color: var(--danger);
+  }
+  .live-dot::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 6px var(--danger);
+    animation: livePulse 1.5s ease-in-out infinite;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  /* ── Corner nodes ── */
+  .node {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: var(--glow-cyan);
+    animation: nodePulse 2s ease-in-out infinite alternate;
+  }
+  .node:nth-child(1) { top: 24px;  left: 24px; }
+  .node:nth-child(2) { top: 24px;  right: 24px; animation-delay: .5s; }
+  .node:nth-child(3) { bottom: 24px; left: 24px; animation-delay: 1s; }
+  .node:nth-child(4) { bottom: 24px; right: 24px; animation-delay: 1.5s; }
+
+  @keyframes nodePulse {
+    0%   { transform: scale(1);    opacity: 1; }
+    100% { transform: scale(1.4);  opacity: 0.5; }
+  }
+</style>
+</head>
+<body>
+<div class="frame-root">
+
+  <!-- Corner nodes -->
+  <div class="node"></div>
+  <div class="node"></div>
+  <div class="node"></div>
+  <div class="node"></div>
+
+  <!-- Live badge -->
+  <div class="live-dot">LIVE</div>
+
+  <!-- The SVG frame (drawn over the webcam source in OBS layer order) -->
+  <svg class="hex-frame" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Clip path: hexagon inscribed in 400x400 -->
+      <clipPath id="hexClip">
+        <polygon points="
+          200,14
+          372,107
+          372,293
+          200,386
+          28,293
+          28,107" />
+      </clipPath>
+
+      <!-- Gradient for border -->
+      <linearGradient id="borderGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%"   stop-color="#7c3aed"/>
+        <stop offset="50%"  stop-color="#00f5ff"/>
+        <stop offset="100%" stop-color="#7c3aed"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Dark fill for areas outside hex (makes edges clean) -->
+    <rect width="400" height="400" fill="#0d0f14"/>
+
+    <!-- Clip mask: only show webcam area inside hex -->
+    <!-- NOTE: In OBS, use an image mask filter on the webcam instead.
+         This SVG just provides the decorative frame on top. -->
+    <rect width="400" height="400" fill="transparent" clip-path="url(#hexClip)"/>
+
+    <!-- Outer spinning dashed ring -->
+    <g class="ring-spin">
+      <polygon
+        points="200,8 378,103 378,297 200,392 22,297 22,103"
+        fill="none"
+        stroke="#7c3aed"
+        stroke-width="1.5"
+        stroke-dasharray="6 10"
+        opacity="0.5"/>
+    </g>
+
+    <!-- Inner counter-spinning ring -->
+    <g class="ring-counter">
+      <polygon
+        points="200,24 362,113 362,287 200,376 38,287 38,113"
+        fill="none"
+        stroke="#00f5ff"
+        stroke-width="1"
+        stroke-dasharray="3 14"
+        opacity="0.35"/>
+    </g>
+
+    <!-- Main glowing hex border -->
+    <polygon class="hex-border"
+      points="200,16 370,107 370,293 200,384 30,293 30,107"
+      fill="none"
+      stroke="url(#borderGrad)"
+      stroke-width="2.5"/>
+
+    <!-- Corner tick marks on the hex -->
+    <g stroke="#00f5ff" stroke-width="2" opacity="0.7">
+      <!-- top vertex ticks -->
+      <line x1="200" y1="16"  x2="192" y2="30"/>
+      <line x1="200" y1="16"  x2="208" y2="30"/>
+      <!-- bottom vertex ticks -->
+      <line x1="200" y1="384" x2="192" y2="370"/>
+      <line x1="200" y1="384" x2="208" y2="370"/>
+    </g>
+  </svg>
+
+  <!-- Username badge -->
+  <div class="name-badge">darkshoxx</div>
+</div>
+</body>
+</html>

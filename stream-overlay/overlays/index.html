@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stream Hub – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html, body {
+    width: 100vw; min-height: 100vh;
+    background: var(--void);
+    overflow: auto;
+  }
+
+  body { padding: 40px; }
+
+  /* ── Page header ── */
+  header {
+    margin-bottom: 40px;
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--purple); text-shadow: var(--glow-purple); }
+  .subtitle {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: .1em;
+    margin-top: 4px;
+  }
+
+  /* ── Grid layout ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  /* ── Overlay card ── */
+  .overlay-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: var(--sp-6);
+    transition: border-color .2s, transform .2s;
+  }
+  .overlay-card:hover {
+    border-color: var(--cyan);
+    transform: translateY(-2px);
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 12px;
+  }
+  .card-icon {
+    font-size: 24px;
+    width: 44px; height: 44px;
+    background: var(--elevated);
+    border-radius: var(--r-md);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--text);
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  /* OBS URL chip */
+  .obs-url {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--cyan);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+    transition: background .15s;
+    margin-bottom: 10px;
+  }
+  .obs-url:hover { background: var(--border); }
+  .obs-url .copy-hint { font-size: 9px; color: var(--text-muted); flex-shrink: 0; }
+  .obs-url.copied { border-color: #34d399; color: #34d399; }
+
+  /* Size info */
+  .size-info {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: .08em;
+    margin-bottom: 14px;
+  }
+
+  /* ── Test event buttons ── */
+  .test-section { margin-top: 40px; }
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .test-btn {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .test-btn:hover { background: var(--purple-dim); border-color: var(--purple); color: #c084fc; }
+  .test-btn:active { transform: scale(.97); }
+
+  /* Status dot */
+  .ws-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 32px;
+  }
+  .ws-dot { width:8px; height:8px; border-radius:50%; background: var(--danger); }
+  .ws-dot.connected { background: #34d399; box-shadow: 0 0 6px #34d399; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">dark<span>shoxx</span> — Stream Hub</div>
+  <div class="subtitle">Local overlay server  ·  OBS Browser Sources</div>
+</header>
+
+<div class="grid">
+
+  <!-- Background -->
+  <div class="overlay-card">
+    <div class="card-header">
+      <div class="card-icon">🌐</div>
+      <div class="card-title">Hex Background</div>
+    </div>
+    <div class="card-desc">Animated tessellated hex-grid scene. Use as a full-scene background or as a panel behind game capture.</div>
+    <div class="size-info">Recommended: 1920 × 1080 px</div>
+    <div class="obs-url" onclick="copyUrl(this, '/background')">
+      <span>http://localhost:3000/background</span>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+
+  <!-- Webcam -->
+  <div class="overlay-card">
+    <div class="card-header">
+      <div class="card-icon">📷</div>
+      <div class="card-title">Webcam Frame</div>
+    </div>
+    <div class="card-desc">Hexagonal frame with pulsing border, spinning rings, and username badge. Layer above your video capture in OBS.</div>
+    <div class="size-info">Recommended: 400 × 400 px</div>
+    <div class="obs-url" onclick="copyUrl(this, '/webcam')">
+      <span>http://localhost:3000/webcam</span>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="overlay-card">
+    <div class="card-header">
+      <div class="card-icon">🔔</div>
+      <div class="card-title">Alerts</div>
+    </div>
+    <div class="card-desc">Follows, subs, raids, Pokémon events, and spin results. Full-screen transparent layer — sits on top of everything.</div>
+    <div class="size-info">Recommended: 1920 × 1080 px</div>
+    <div class="obs-url" onclick="copyUrl(this, '/alerts')">
+      <span>http://localhost:3000/alerts</span>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="overlay-card">
+    <div class="card-header">
+      <div class="card-icon">💬</div>
+      <div class="card-title">Chat Overlay</div>
+    </div>
+    <div class="card-desc">Scrolling chat with per-user color, badge chips, and smooth enter/exit animations. Push messages from the bot.</div>
+    <div class="size-info">Recommended: 340 × 600 px</div>
+    <div class="obs-url" onclick="copyUrl(this, '/chat')">
+      <span>http://localhost:3000/chat</span>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div class="overlay-card">
+    <div class="card-header">
+      <div class="card-icon">🖥</div>
+      <div class="card-title">HUD</div>
+    </div>
+    <div class="card-desc">Stream timer, spin cooldown bar, and now-playing widget. Anchored top-right, transparent background.</div>
+    <div class="size-info">Recommended: 1920 × 1080 px</div>
+    <div class="obs-url" onclick="copyUrl(this, '/hud')">
+      <span>http://localhost:3000/hud</span>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Test panel -->
+<div class="test-section">
+  <div class="section-title">Fire test events</div>
+  <div class="btn-row">
+    <button class="test-btn" onclick="fire('follow')">♡ Follow</button>
+    <button class="test-btn" onclick="fire('sub')">★ New Sub</button>
+    <button class="test-btn" onclick="fire('resub')">★ Resub ×7</button>
+    <button class="test-btn" onclick="fire('pokemon')">⚡ Pokémon</button>
+    <button class="test-btn" onclick="fire('spin')">🎡 Spin</button>
+    <button class="test-btn" onclick="fire('raid')">⚔ Raid</button>
+  </div>
+</div>
+
+<div class="ws-status">
+  <div class="ws-dot" id="ws-dot"></div>
+  <span id="ws-label">Connecting…</span>
+</div>
+
+<script src="/js/ws-client.js"></script>
+<script>
+function copyUrl(el, path) {
+  const url = `http://localhost:3000${path}`;
+  navigator.clipboard.writeText(url).then(() => {
+    el.classList.add('copied');
+    el.querySelector('.copy-hint').textContent = 'copied!';
+    setTimeout(() => {
+      el.classList.remove('copied');
+      el.querySelector('.copy-hint').textContent = 'click to copy';
+    }, 2000);
+  });
+}
+
+function fire(type) {
+  fetch(`/test/${type}`).catch(() => {});
+}
+
+// WebSocket connection status
+const dot   = document.getElementById('ws-dot');
+const label = document.getElementById('ws-label');
+
+window.addEventListener('overlay:connected', () => {
+  dot.classList.add('connected');
+  label.textContent = 'WebSocket connected';
+});
+
+// Detect ws-client connected event
+const _orig = WebSocket.prototype.send;
+// Check for our custom connected event
+window.addEventListener('overlay:connected', () => {});
+// Simple fallback: try to detect WS state
+setInterval(() => {
+  // The ws-client script fires 'overlay:connected' on message type=connected
+  // We detect it here instead
+}, 500);
+</script>
+
+<script>
+// Override the ws-client to also update the indicator
+(function() {
+  const CHECK = setInterval(() => {
+    const el = document.getElementById('ws-dot');
+    if (!el) return;
+    // If we got here, the page loaded and ws-client is trying to connect
+    // We use a simple fetch as fallback
+    fetch('/test/ping').catch(() => {});
+    clearInterval(CHECK);
+  }, 100);
+})();
+
+window.addEventListener('overlay:connected', () => {
+  document.getElementById('ws-dot').classList.add('connected');
+  document.getElementById('ws-label').textContent = 'WebSocket connected — ready';
+});
+</script>
+</body>
+</html>

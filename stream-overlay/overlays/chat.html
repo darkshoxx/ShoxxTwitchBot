@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chat – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html, body { width:340px; height:600px; background:transparent; overflow:hidden; }
+
+  /* ── Chat panel ── */
+  #chat-wrap {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    /* messages appear from bottom */
+  }
+
+  /* Fade-to-transparent top mask */
+  #chat-wrap::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 120px;
+    background: linear-gradient(to bottom, transparent 0%, rgba(13,15,20,.0) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── Individual message ── */
+  .msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: rgba(20,23,32,.82);
+    border-left: 3px solid var(--user-color, var(--cyan));
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    padding: 6px 10px 6px 8px;
+    backdrop-filter: blur(6px);
+    animation: msgIn 0.3s var(--ease-out-expo) both;
+    position: relative;
+    overflow: hidden;
+  }
+  .msg::after {
+    content: '';
+    position: absolute; top:0; left:-80%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.04), transparent);
+    animation: msgShine 0.5s 0.1s ease-out both;
+  }
+  @keyframes msgShine {
+    0%   { left: -80%; }
+    100% { left: 160%; }
+  }
+  @keyframes msgIn {
+    0%   { opacity:0; transform: translateX(-12px); }
+    100% { opacity:1; transform: translateX(0); }
+  }
+  .msg.exiting {
+    animation: msgOut 0.25s ease-in both;
+  }
+  @keyframes msgOut {
+    to { opacity:0; transform: translateX(-8px); height:0; margin:0; padding:0; }
+  }
+
+  /* Avatar circle (initials) */
+  .msg-avatar {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--user-color, var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 900;
+    color: var(--void);
+    opacity: 0.9;
+  }
+
+  .msg-body { flex: 1; min-width: 0; }
+
+  .msg-name {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    color: var(--user-color, var(--cyan));
+    margin-bottom: 2px;
+  }
+  .msg-name .badge {
+    display: inline-block;
+    background: var(--user-color, var(--cyan));
+    color: var(--void);
+    font-size: 8px;
+    letter-spacing: .1em;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: 5px;
+    vertical-align: middle;
+    font-weight: 900;
+  }
+
+  .msg-text {
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-word;
+    line-height: 1.4;
+  }
+
+  /* Broadcaster highlight */
+  .msg.broadcaster {
+    background: rgba(124,58,237,.18);
+    border-left-color: var(--purple);
+  }
+</style>
+</head>
+<body>
+<div id="chat-wrap"></div>
+
+<script src="/js/ws-client.js"></script>
+<script>
+/*
+  NOTE: Twitch chat messages are pushed from your Python bot via:
+    POST /event  { "type": "chat", "user": "name", "text": "...", "color": "#hex", "badges": ["mod"] }
+
+  The bot integration is a one-liner in main.py's on_message handler —
+  see the refactor suggestions in refactor-notes.md.
+*/
+
+const wrap = document.getElementById('chat-wrap');
+const MAX_MESSAGES = 12;
+
+// Generate a stable color for users without one set
+function userColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+  const hue = ((h >>> 0) % 300) + 180; // 180-480 maps to blue/purple/cyan range
+  return `hsl(${hue % 360}, 70%, 65%)`;
+}
+
+function addMessage({ user, text, color, badges = [] }) {
+  // Remove old messages if over limit
+  const msgs = wrap.querySelectorAll('.msg');
+  if (msgs.length >= MAX_MESSAGES) {
+    const oldest = msgs[0];
+    oldest.classList.add('exiting');
+    oldest.addEventListener('animationend', () => oldest.remove(), { once: true });
+  }
+
+  const c = color || userColor(user);
+  const initials = user.slice(0, 2).toUpperCase();
+  const isBroadcaster = badges.includes('broadcaster');
+  const badgeHtml = badges
+    .filter(b => ['mod','vip','broadcaster','sub'].includes(b))
+    .map(b => `<span class="badge">${b.toUpperCase()}</span>`)
+    .join('');
+
+  const el = document.createElement('div');
+  el.className = `msg${isBroadcaster ? ' broadcaster' : ''}`;
+  el.style.setProperty('--user-color', c);
+  el.innerHTML = `
+    <div class="msg-avatar">${initials}</div>
+    <div class="msg-body">
+      <div class="msg-name">${escHtml(user)}${badgeHtml}</div>
+      <div class="msg-text">${escHtml(text)}</div>
+    </div>
+  `;
+  wrap.appendChild(el);
+
+  // Keep scroll at bottom
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── WebSocket chat messages ───────────────────────────────
+window.addEventListener('overlay:chat', e => addMessage(e.detail));
+
+// ── Dev: seed a few demo messages on load ─────────────────
+const demos = [
+  { user: 'darkshoxx',  text: 'Chat overlay is live 🎮', color: '#7c3aed', badges: ['broadcaster'] },
+  { user: 'CoolViewer', text: 'LUL that was amazing!!', color: '#00f5ff' },
+  { user: 'MystFan99',  text: 'pokemon gen3 let\'s go!!', color: '#f59e0b' },
+  { user: 'SpeedDemon', text: 'spin', color: '#34d399', badges: ['sub'] },
+];
+demos.forEach((d, i) => setTimeout(() => addMessage(d), i * 200));
+</script>
+</body>
+</html>

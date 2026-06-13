@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Background – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html, body { width:100vw; height:100vh; background: var(--void); overflow:hidden; }
+
+  canvas#hex {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* Radial vignette so edges blend into game capture */
+  .vignette {
+    position: fixed; inset: 0;
+    background: radial-gradient(
+      ellipse 90% 80% at 50% 50%,
+      transparent 40%,
+      rgba(13,15,20,.85) 100%
+    );
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Slow-drift aurora behind the hex grid */
+  .aurora {
+    position: fixed; inset: -20%;
+    width: 140%; height: 140%;
+    background:
+      radial-gradient(ellipse 60% 40% at 30% 60%, rgba(124,58,237,.18) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 35% at 70% 35%, rgba(0,245,255,.12) 0%, transparent 70%);
+    animation: auroraDrift 18s ease-in-out infinite alternate;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  @keyframes auroraDrift {
+    0%   { transform: translate(0,0) rotate(0deg); }
+    100% { transform: translate(3%, 4%) rotate(2deg); }
+  }
+</style>
+</head>
+<body class="scanlines">
+  <div class="aurora"></div>
+  <canvas id="hex"></canvas>
+  <div class="vignette"></div>
+
+<script>
+const canvas = document.getElementById('hex');
+const ctx    = canvas.getContext('2d');
+
+// ── Config ────────────────────────────────────────────────
+const CFG = {
+  hexSize:     38,       // radius of each hex
+  gap:          2,       // gap between hexes
+  scrollSpeedX: 0.18,   // px/frame rightward drift
+  scrollSpeedY: 0.10,   // px/frame downward drift
+  pulseSpeed:   0.008,  // glow pulse rate
+  colorA: [124, 58,  237],  // purple
+  colorB: [  0,245,  255],  // cyan
+  colorDim: [30, 40, 70],   // resting hex fill
+  bgColor: '#0d0f14',
+};
+
+let W, H, cols, rows;
+let offsetX = 0, offsetY = 0;
+let tick = 0;
+
+// ── Hex grid geometry ─────────────────────────────────────
+function hexWidth()  { return Math.sqrt(3) * CFG.hexSize; }
+function hexHeight() { return 2 * CFG.hexSize; }
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  const hW = hexWidth() + CFG.gap;
+  const hH = (hexHeight() * 3/4) + CFG.gap;
+  cols = Math.ceil(W / hW) + 3;
+  rows = Math.ceil(H / hH) + 3;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function hexPath(cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 180 * (60 * i - 30);
+    const x = cx + r * Math.cos(a);
+    const y = cy + r * Math.sin(a);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function lerpColor(a, b, t) {
+  return a.map((v, i) => Math.round(v + (b[i] - v) * t));
+}
+
+function drawFrame() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = CFG.bgColor;
+  ctx.fillRect(0, 0, W, H);
+
+  tick++;
+  offsetX = (offsetX + CFG.scrollSpeedX) % (hexWidth() + CFG.gap);
+  offsetY = (offsetY + CFG.scrollSpeedY) % ((hexHeight() * 3/4) + CFG.gap);
+
+  const hW = hexWidth() + CFG.gap;
+  const hH = (hexHeight() * 3/4) + CFG.gap;
+
+  for (let row = -2; row < rows; row++) {
+    for (let col = -2; col < cols; col++) {
+      const stagger = col % 2 === 0 ? 0 : hH / 2;
+      const cx = col * hW - offsetX;
+      const cy = row * hH + stagger - offsetY;
+
+      // Wave function: distance from screen center + time
+      const dx = cx - W / 2;
+      const dy = cy - H / 2;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const wave = Math.sin(dist * 0.012 - tick * CFG.pulseSpeed) * 0.5 + 0.5;
+      const brightness = Math.pow(wave, 2.5);  // sharpen peaks
+
+      const [r,g,b] = lerpColor(CFG.colorDim, lerpColor(CFG.colorA, CFG.colorB, wave), brightness * 0.85);
+      const alpha = 0.3 + brightness * 0.55;
+
+      hexPath(cx, cy, CFG.hexSize - CFG.gap);
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.fill();
+
+      // Inner glow ring on bright hexes
+      if (brightness > 0.7) {
+        ctx.strokeStyle = `rgba(${r},${g},${b},${(brightness - 0.7) * 1.5})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  }
+
+  requestAnimationFrame(drawFrame);
+}
+
+drawFrame();
+</script>
+</body>
+</html>

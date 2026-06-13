@@ -16,6 +16,17 @@ from twitchAPI.oauth import UserAuthenticationStorageHelper, UserAuthenticator
 from twitchAPI.twitch import Twitch
 from twitchAPI.type import AuthScope, ChatEvent
 from unidecode import unidecode
+import aiohttp
+
+OVERLAY_URL = "http://localhost:3000/event"
+
+async def push_overlay_event(payload: dict):
+    """Fire-and-forget POST to the local overlay server."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            await session.post(OVERLAY_URL, json=payload, timeout=aiohttp.ClientTimeout(total=1))
+    except Exception:
+        pass # should never happen...
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 # os.chdir(HERE)    # Commenting out this line undoes the crash
@@ -50,7 +61,7 @@ elif STREAMING_SOFTWARE == "SLOBS":
                                         scene_dict, shiv_song_dict,
                                         toggle_webcam_active)
 
-HERE = os.path.abspath(os.path.dirname(__file__))
+# HERE = os.path.abspath(os.path.dirname(__file__))
 BANFILE = os.path.join(HERE, "banned_terms.txt")
 ENV = os.path.join(HERE, ".env")
 load_dotenv(ENV)
@@ -107,12 +118,13 @@ USER_SCOPE = [
 TARGET_CHANNEL = "darkshoxx"
 
 ABORT = False
+auto_spin = False
 # Path for Grandomizer Shenanigans
 INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
 POKE_LOG = os.path.join(HERE, "pokelog.txt")
 TOKEN_FILE = os.path.join(HERE, "user_token.json")
 BAD_TERMS_START = ["aiviewersst","wantpopular", "wannamorevi", "topviewerss","bestviewers", "cheapviewer", "cheapfollow", "bestfollowe", "viewersstre", "estviewersm"] # ALL TERMS HAVE 11 CHARACTERS
-BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers" "op58.online", "eamboo.live", "vethespace)", "reamboo.org", "xadsxonline", "reamboo.com"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers", "op58.online", "eamboo.live", "vethespace)", "reamboo.org", "xadsxonline", "reamboo.com"] # ALL TERMS HAVE 11 CHARACTERS
 BAD_WITH_APPENDAGE = [shoxxword + starter for shoxxword in ["darkshoxx", "@darkshoxx"] for starter in BAD_TERMS_START]
 BAN_TIMEOUT = 5
 # auto_spin = False
@@ -393,6 +405,7 @@ async def test_message_for_pokemon(msg: ChatMessage):
             dex = random_pokemon(1, 1025)
         poke_logger(dex)
         generate_question_video(dex)
+        await push_overlay_event({"type": "pokemon", "dex": dex})
         await play_me(
             poke_vid_dict["question"],
             scene_dict["poke"],
@@ -474,6 +487,13 @@ class InheritedBot(Chat):
             print(
                 f"{msg.user.name} Sent an NAUGHTY message in {msg.room.name}!"
                 )
+        await push_overlay_event({
+            "type": "chat",
+            "user": msg.user.name,
+            "text": msg.text,
+            "color": getattr(msg.user, 'color', None),
+            "badges": list(msg.user.badges.keys()) if msg.user.badges else [],
+        })
 
 
 def kill_inactive_players(bot: InheritedBot):
@@ -534,6 +554,7 @@ async def test_message_for_spin(bot: InheritedBot, msg: ChatMessage):
         if spin:
             await msg.reply(f"{msg.user.name} Successfully redeemed SPIN")
             send_spin()
+            await push_overlay_event({"type":"spin", "user": msg.user.name})
             # put_wheel_in_foreground()
             # hotkey("ctrl","alt","shift")
             spin = False

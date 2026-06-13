@@ -1,0 +1,87 @@
+/* ═══════════════════════════════════════════════════════════
+   tokens.css  —  darkshoxx stream overlay design system
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;700&display=swap');
+
+:root {
+  /* ── Palette ── */
+  --void:      #0d0f14;   /* near-black base */
+  --surface:   #141720;   /* panel background */
+  --elevated:  #1e2235;   /* raised element */
+  --border:    #2a3050;   /* subtle divider */
+  --purple:    #7c3aed;   /* primary accent */
+  --purple-dim:#4a1d96;   /* muted purple */
+  --cyan:      #00f5ff;   /* highlight / glow */
+  --cyan-dim:  #00b8c4;
+  --amber:     #f59e0b;   /* warm event color */
+  --amber-dim: #92400e;
+  --text:      #e2e8f0;   /* body copy */
+  --text-muted:#8892aa;   /* secondary copy */
+  --danger:    #ef4444;
+
+  /* ── Glow shadows ── */
+  --glow-cyan:   0 0 8px rgba(0,245,255,.6), 0 0 24px rgba(0,245,255,.25);
+  --glow-purple: 0 0 8px rgba(124,58,237,.7), 0 0 24px rgba(124,58,237,.3);
+  --glow-amber:  0 0 8px rgba(245,158,11,.7), 0 0 24px rgba(245,158,11,.3);
+
+  /* ── Typography ── */
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --font-body:    'Inter', sans-serif;
+
+  /* ── Spacing ── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* ── Radii ── */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+
+  /* ── Motion ── */
+  --ease-out-expo: cubic-bezier(0.16,1,0.3,1);
+  --ease-spring:   cubic-bezier(0.34,1.56,0.64,1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow: hidden;
+  width: 100%; height: 100%;
+}
+
+/* ── Utility: glowing border ── */
+.border-glow-cyan   { border: 1px solid var(--cyan);   box-shadow: var(--glow-cyan); }
+.border-glow-purple { border: 1px solid var(--purple); box-shadow: var(--glow-purple); }
+.border-glow-amber  { border: 1px solid var(--amber);  box-shadow: var(--glow-amber); }
+
+/* ── Scanline texture overlay (apply to any full-screen bg) ── */
+.scanlines::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,.12) 3px,
+    rgba(0,0,0,.12) 4px
+  );
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
