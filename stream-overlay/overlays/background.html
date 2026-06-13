@@ -104,11 +104,11 @@ function drawFrame() {
   ctx.fillRect(0, 0, W, H);
 
   tick++;
-  offsetX = (offsetX + CFG.scrollSpeedX) % (hexWidth() + CFG.gap);
-  offsetY = (offsetY + CFG.scrollSpeedY) % ((hexHeight() * 3/4) + CFG.gap);
-
   const hW = hexWidth() + CFG.gap;
   const hH = (hexHeight() * 3/4) + CFG.gap;
+
+  offsetX = (offsetX + CFG.scrollSpeedX) % (2 * hW);
+  offsetY = (offsetY + CFG.scrollSpeedY) % hH;
 
   for (let row = -2; row < rows; row++) {
     for (let col = -2; col < cols; col++) {
