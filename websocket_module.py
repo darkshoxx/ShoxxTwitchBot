@@ -83,6 +83,7 @@ async def toggle_webcam_active():
     #     requests.GetSceneItemList(**facecam_scene[0])
     #     ).getSceneItems()
     # print(video_item_list)
+    await asyncio.sleep(10)
     press_call_once = ws.call(requests.PressInputPropertiesButton(
         inputName="BGRemoved Facecam",
         propertyName="activate"
@@ -114,13 +115,18 @@ async def play_me(index: int, scene_index: str, sleep_time=30):
     print("List of objects found:")
     print(mylist)
     if not index:
-        index = random.sample([index for index, _ in mylist], 1)[0]
-
+        index, source = random.sample([(index, source) for index, source in mylist], 1)[0]
+    source = next(src for idx, src in mylist if idx == index)
     the_call = ws.call(requests.SetSceneItemEnabled(
         sceneName=video_scene[0]['sceneName'],
         sceneItemId=index,
         sceneItemEnabled=False
         ))
+    ws.call(requests.TriggerMediaInputAction(
+        inputName=source, mediaAction="OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART"
+        ))
+
+    await asyncio.sleep(0.5)
     print(the_call)
     await asyncio.sleep(1)
     the_call = ws.call(requests.SetSceneItemEnabled(

@@ -17,6 +17,8 @@ from twitchAPI.twitch import Twitch
 from twitchAPI.type import AuthScope, ChatEvent
 from unidecode import unidecode
 
+HERE = os.path.abspath(os.path.dirname(__file__))
+# os.chdir(HERE)    # Commenting out this line undoes the crash
 from pokemon import (generate_answer_video, generate_question_video,
                      get_pokemon_type_list, poketypes)
 
@@ -107,13 +109,13 @@ TARGET_CHANNEL = "darkshoxx"
 ABORT = False
 # Path for Grandomizer Shenanigans
 INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
-
 POKE_LOG = os.path.join(HERE, "pokelog.txt")
 TOKEN_FILE = os.path.join(HERE, "user_token.json")
-BAD_TERMS_START = ["bestviewers", "cheapviewer", "cheapfollow", "bestfollowe"] # ALL TERMS HAVE 11 CHARACTERS
-BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers" "op58.online"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_TERMS_START = ["aiviewersst","wantpopular", "wannamorevi", "topviewerss","bestviewers", "cheapviewer", "cheapfollow", "bestfollowe", "viewersstre", "estviewersm"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers" "op58.online", "eamboo.live", "vethespace)", "reamboo.org", "xadsxonline", "reamboo.com"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_WITH_APPENDAGE = [shoxxword + starter for shoxxword in ["darkshoxx", "@darkshoxx"] for starter in BAD_TERMS_START]
 BAN_TIMEOUT = 5
-auto_spin = False
+# auto_spin = False
 
 # Wheel section
 def put_wheel_in_foreground():
@@ -196,6 +198,8 @@ def test_for_best_viewers(message: str):
     message_trunc_end = message_for_comparsion[-11:]
     print("truncated message:", message_trunc_start)
     if (message_trunc_start in BAD_TERMS_START):
+        return True
+    if (message_trunc_start in BAD_WITH_APPENDAGE):
         return True
     if (message_trunc_end in BAD_TERMS_END):
         return True
@@ -536,8 +540,8 @@ async def test_message_for_spin(bot: InheritedBot, msg: ChatMessage):
 
 
 async def run():
-    print("Is Running...")
-    # Twitch Client (big Daddy)
+    print("Bot starting in 2 seconds...")
+    await asyncio.sleep(2)
     twitch = await Twitch(client_id, client_secret)
 
     get_opera()
