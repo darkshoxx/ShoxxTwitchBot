@@ -1,11 +1,11 @@
 import asyncio
 import os
-
+from pathlib import Path
 import requests
 from WhoDisPokemon.main import prepare_answer, prepare_question
 
-HERE = os.path.abspath(os.path.dirname(__file__))
-OUTPUT_FOLDER = os.path.join(HERE, "output")
+HERE = Path(os.path.dirname(__file__))
+OUTPUT_FOLDER = HERE / "stream-overlay" / "public" / "assets" / "videos" / "Pokemon"
 OUTPUT_QUESTION = os.path.join(OUTPUT_FOLDER, "question.mp4")
 OUTPUT_ANSWER = os.path.join(OUTPUT_FOLDER, "answer.mp4")
 

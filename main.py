@@ -52,8 +52,8 @@ STREAMING_SOFTWARE = "OBS"
 
 if STREAMING_SOFTWARE == "OBS":
     from websocket_module import (loom_song_dict, myst_song_dict,
-                                  oot_song_dict, play_me, poke_vid_dict,
-                                  scene_dict, shiv_song_dict,
+                                  oot_song_dict, poke_vid_dict,
+                                  shiv_song_dict, play_me, scene_dict,
                                   toggle_webcam_active)
 elif STREAMING_SOFTWARE == "SLOBS":
     from websocket_module_SLOBS import (loom_song_dict, myst_song_dict,
@@ -405,13 +405,15 @@ async def test_message_for_pokemon(msg: ChatMessage):
             dex = random_pokemon(1, 1025)
         poke_logger(dex)
         generate_question_video(dex)
-        await push_overlay_event({"type": "pokemon", "dex": dex})
+        await asyncio.sleep(1)
+        # await push_overlay_event({"type": "pokemon", "dex": dex})
         await play_me(
             poke_vid_dict["question"],
             scene_dict["poke"],
             sleep_time=10
             )
         generate_answer_video(dex)
+        await asyncio.sleep(15)
         await play_me(
             poke_vid_dict["answer"],
             scene_dict["poke"],
@@ -443,8 +445,10 @@ async def test_message_for_banned_terms(bot: Chat, msg: ChatMessage):
 
 
 async def test_message_for_tom_scott(msg: ChatMessage):
+    # print("MSG for tom scott")
     words = msg.text.split(" ")
     if words[0].lower() == "where":
+        print("WHERE MSG for tom scott")
         await play_me(None, scene_dict["where"])
     if words[0].lower() == "what":
         await play_me(None, scene_dict["what"])
@@ -562,6 +566,7 @@ async def test_message_for_spin(bot: InheritedBot, msg: ChatMessage):
 
 async def run():
     print("Bot starting in 2 seconds...")
+    print("MSG for tom scott")
     await asyncio.sleep(2)
     twitch = await Twitch(client_id, client_secret)
 

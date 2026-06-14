@@ -9,8 +9,6 @@
 
   /* ── Video player: centered, unscaled ── */
   #video-player {
-    width: 50%;
-    height: auto;
     position: fixed;
     top: 50%;
     left: 50%;
@@ -307,58 +305,25 @@ window.addEventListener('overlay:spin',    e => alertSpin(e.detail));
 const videoEl = document.getElementById('video-player');
 let videoHideTimer = null;
 
-console.log('[video] element found:', videoEl);
-
-// Log every native video event so we can see exactly where it stalls
-['loadstart','loadedmetadata','loadeddata','canplay','canplaythrough','play','playing','error','stalled','waiting','abort','emptied'].forEach(evt => {
-  videoEl.addEventListener(evt, () => {
-    const err = videoEl.error;
-    console.log(`[video] event: ${evt} | src: ${videoEl.src} | readyState: ${videoEl.readyState} | networkState: ${videoEl.networkState}${err ? ' | error code:' + err.code + ' msg:' + err.message : ''}`);
-  });
-});
-
 window.addEventListener('overlay:video', e => {
-  console.log('[video] overlay:video event received', e.detail);
   const { src, duration = 30 } = e.detail;
-  console.log(`[video] setting src="${src}", duration=${duration}s`);
   clearTimeout(videoHideTimer);
   videoEl.src = src;
   videoEl.classList.add('active');
-  console.log('[video] classList after add:', videoEl.className);
-  console.log('[video] computed display:', getComputedStyle(videoEl).display);
-  videoEl.play().then(() => {
-    console.log('[video] play() resolved OK');
-  }).catch(err => {
-    console.error('[video] play() rejected:', err);
-  });
+  videoEl.play();
   videoHideTimer = setTimeout(() => {
-    console.log('[video] hide timer fired');
     videoEl.classList.remove('active');
     videoEl.pause();
     videoEl.src = '';
-    // videoEl.removeAttribute('src');
   }, duration * 1000);
 });
 
+// Also hide as soon as the video ends naturally (if shorter than duration)
 videoEl.addEventListener('ended', () => {
-  console.log('[video] ended naturally');
   clearTimeout(videoHideTimer);
   videoEl.classList.remove('active');
   videoEl.src = '';
-  // videoEl.removeAttribute('src');
 });
-
-// ── WebSocket raw message logging ─────────────────────────
-// Patch ws-client after it connects by monitoring all overlay:* events
-['video','follow','sub','raid','pokemon','spin'].forEach(type => {
-  window.addEventListener(`overlay:${type}`, e => {
-    console.log(`[ws] dispatched overlay:${type}`, e.detail);
-  });
-});
-
-// Also confirm the page loaded and WS URL
-console.log('[init] alerts.html loaded, expecting WS at ws://' + location.host);
-console.log('[init] video element display style (inline):', videoEl.style.display);
 </script>
 </body>
 </html>
