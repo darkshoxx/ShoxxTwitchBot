@@ -681,15 +681,25 @@ def start_bot():
     bot_thread.start()
 
 def stop_bot():
+    global bot_thread
     if loop and loop.is_running():
         loop.call_soon_threadsafe(stop_event.set)
+    
+    # Block OBS from reloading until the old thread has completely exited
+    if bot_thread and bot_thread.is_alive():
+        bot_thread.join(timeout=3)
 
 def run_bot():
     global loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run())
-    loop.close()
+    local_loop = asyncio.new_event_loop()
+    loop = local_loop  # Keep global reference for stop_bot tracking
+    asyncio.set_event_loop(local_loop)
+    
+    try:
+        local_loop.run_until_complete(run())
+    finally:
+        # Use the local reference so a reloading thread cannot spoof this call
+        local_loop.close()
 
 def script_load(settings):
     global node_process
