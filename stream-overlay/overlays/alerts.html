@@ -310,8 +310,10 @@ let videoHideTimer = null;
 const CHROMA_KEYS = [
   { match: '/assets/videos/OOT/',     key: ChromaKey.BLACK },
   { match: '/assets/videos/Loom/',    key: ChromaKey.BLACK },
-  { match: '/assets/videos/Myst/',    key: ChromaKey.GREEN },
-  { match: '/assets/videos/Shivers/', key: ChromaKey.BLUE  },
+  // Green #22b24d
+  { match: '/assets/videos/Myst/',    key: { r: 34, g: 178, b: 77, threshold:80 } },
+  // Blue #3f47c9 (hex translates closer to 63, 71, 201, but the threshold will cover the 1-value difference)
+  { match: '/assets/videos/Shivers/', key: { r: 63, g: 72, b: 202, threshold: 80 } },
 ];
 
 const ck = ChromaKey(videoEl, ChromaKey.BLACK);
@@ -334,11 +336,11 @@ window.addEventListener('overlay:video', e => {
 
   const keyColor = getChromaKey(src);
   if (keyColor) {
-    ck.setKey(keyColor);
-    ck.start();
-  } else {
-    ck.stop();
-  }
+      ck.setKey(keyColor);
+    } else {
+      ck.setKey({ threshold: -1 }); // Disables keying
+    }
+    ck.start(); // Always run the canvas
 
   videoEl.src = src;
   videoEl.classList.add('active');

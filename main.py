@@ -30,14 +30,11 @@ def render_emotes(text: str, emotes: dict) -> str:
         import html
         return html.escape(text)
  
-    # Build list of (start, end, emote_id) sorted by start position
+# Build list of (start, end, emote_id) sorted by start position
     ranges = []
     for emote_id, positions in emotes.items():
-        for start, end in positions:
-            try:
-                ranges.append((int(start), int(end), emote_id))
-            except ValueError as e:
-                print(e)
+        for pos in positions:
+            ranges.append((int(pos['start_position']), int(pos['end_position']), emote_id))
     ranges.sort(key=lambda x: x[0])
  
     import html
