@@ -36,29 +36,72 @@ async function connectOBS() {
   try {
     await obs.connect('ws://localhost:4455', process.env.OBS_PW);
     console.log('[obs] connected');
+
+    // --- Add the refresh routine here ---
+    await refreshBrowserSources();
+
   } catch (e) {
     console.warn('[obs] could not connect:', e.message);
     obs = null;
   }
 }
 
+async function refreshBrowserSources() {
+  try {
+    // 1. Get a list of all inputs in OBS
+    const { inputs } = await obs.call('GetInputList');
+    
+    // 2. Filter for browser sources ('browser_source' is the internal OBS id)
+    const browserInputs = inputs.filter(input => input.inputKind === 'browser_source');
+    
+    console.log(`[obs] Refreshing ${browserInputs.length} browser sources...`);
+
+    // 3. Fire the refresh command for each one
+    for (const input of browserInputs) {
+      await obs.call('PressInputPropertiesButton', {
+        inputName: input.inputName,
+        propertyName: 'refreshnocache' // Tells OBS to click the "Refresh cache of current page" button
+      });
+    }
+    console.log('[obs] All browser sources refreshed successfully.');
+  } catch (err) {
+    console.error('[obs] Failed to refresh browser sources:', err.message);
+  }
+}
+
 // OBS scene names for the two toggleable sources
 // Set these to whatever your OBS scenes are actually called
 const OBS_SCENES = {
-  notescam:  'Notescam Scene',
+  notescam:  '4 Notescam SOURCE',
   livesplit: 'Livesplit Scene',
 };
 
-async function setOBSSceneVisible(sceneName, visible) {
+// async function setOBSSceneVisible(sceneName, visible) {
+//   if (!obs) return;
+//   try {
+//     await obs.call('SetSceneItemEnabled', {
+//       sceneName: '00 Notescam',        // your parent scene name
+//       sceneItemId: sceneName,   // if using nested scenes; adjust as needed
+//       sceneItemEnabled: visible,
+//     });
+//   } catch (e) {
+//     console.warn('[obs] setVisible failed:', e.message);
+//   }
+// }
+
+async function setSourceVisible(sceneName, sourceName, visible) {
   if (!obs) return;
   try {
+    const { sceneItems } = await obs.call('GetSceneItemList', { sceneName });
+    const item = sceneItems.find(i => i.sourceName === sourceName);
+    if (!item) { console.warn(`[obs] source "${sourceName}" not found in "${sceneName}"`); return; }
     await obs.call('SetSceneItemEnabled', {
-      sceneName: 'Main',        // your parent scene name
-      sceneItemId: sceneName,   // if using nested scenes; adjust as needed
+      sceneName,
+      sceneItemId: item.sceneItemId,
       sceneItemEnabled: visible,
     });
   } catch (e) {
-    console.warn('[obs] setVisible failed:', e.message);
+    console.warn('[obs] setSourceVisible failed:', e.message);
   }
 }
 
@@ -101,7 +144,7 @@ app.post('/toggle/:source', async (req, res) => {
 
   layout[src] = !layout[src];
   broadcast({ type: 'layout', ...layout });
-  await setOBSSceneVisible(OBS_SCENES[src], layout[src]);
+  await setSourceVisible('00 Notescam', '4 Notescam SOURCE', layout.notescam);
 
   console.log(`[layout] ${src} → ${layout[src]}`);
   res.json({ ok: true, layout });
