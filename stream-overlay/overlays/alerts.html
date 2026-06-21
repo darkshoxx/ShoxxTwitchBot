@@ -9,8 +9,6 @@
 
   /* ── Video player: centered, unscaled ── */
   #video-player {
-    width: 50%;
-    height: auto;
     position: fixed;
     top: 50%;
     left: 50%;
@@ -183,6 +181,7 @@
 <video id="video-player" autoplay></video>
 <div id="alert-root"></div>
 
+<script src="/js/chromakey.js"></script>
 <script src="/js/ws-client.js"></script>
 <script>
 const root = document.getElementById('alert-root');
@@ -303,62 +302,54 @@ window.addEventListener('overlay:raid',    e => alertRaid(e.detail));
 window.addEventListener('overlay:pokemon', e => alertPokemon(e.detail));
 window.addEventListener('overlay:spin',    e => alertSpin(e.detail));
 
-// ── Video player ──────────────────────────────────────────
+// ── Video player with chroma key ─────────────────────────
 const videoEl = document.getElementById('video-player');
 let videoHideTimer = null;
 
-console.log('[video] element found:', videoEl);
+// Chroma key colour per video category (matched by src path prefix)
+const CHROMA_KEYS = [
+  { match: '/assets/videos/OOT/',     key: ChromaKey.BLACK },
+  { match: '/assets/videos/Loom/',    key: ChromaKey.BLACK },
+  { match: '/assets/videos/Myst/',    key: ChromaKey.GREEN },
+  { match: '/assets/videos/Shivers/', key: ChromaKey.BLUE  },
+];
 
-// Log every native video event so we can see exactly where it stalls
-['loadstart','loadedmetadata','loadeddata','canplay','canplaythrough','play','playing','error','stalled','waiting','abort','emptied'].forEach(evt => {
-  videoEl.addEventListener(evt, () => {
-    const err = videoEl.error;
-    console.log(`[video] event: ${evt} | src: ${videoEl.src} | readyState: ${videoEl.readyState} | networkState: ${videoEl.networkState}${err ? ' | error code:' + err.code + ' msg:' + err.message : ''}`);
-  });
-});
+const ck = ChromaKey(videoEl, ChromaKey.BLACK);
+ck.start();
+
+function getChromaKey(src) {
+  const match = CHROMA_KEYS.find(c => src.includes(c.match));
+  return match ? match.key : null; // null = no chroma key needed
+}
+
+function stopVideo() {
+  videoEl.classList.remove('active');
+  videoEl.pause();
+  videoEl.removeAttribute('src');
+}
 
 window.addEventListener('overlay:video', e => {
-  console.log('[video] overlay:video event received', e.detail);
   const { src, duration = 30 } = e.detail;
-  console.log(`[video] setting src="${src}", duration=${duration}s`);
   clearTimeout(videoHideTimer);
+
+  const keyColor = getChromaKey(src);
+  if (keyColor) {
+    ck.setKey(keyColor);
+    ck.start();
+  } else {
+    ck.stop();
+  }
+
   videoEl.src = src;
   videoEl.classList.add('active');
-  console.log('[video] classList after add:', videoEl.className);
-  console.log('[video] computed display:', getComputedStyle(videoEl).display);
-  videoEl.play().then(() => {
-    console.log('[video] play() resolved OK');
-  }).catch(err => {
-    console.error('[video] play() rejected:', err);
-  });
-  videoHideTimer = setTimeout(() => {
-    console.log('[video] hide timer fired');
-    videoEl.classList.remove('active');
-    videoEl.pause();
-    videoEl.src = '';
-    // videoEl.removeAttribute('src');
-  }, duration * 1000);
+  videoEl.play().catch(() => {});
+  videoHideTimer = setTimeout(stopVideo, duration * 1000);
 });
 
 videoEl.addEventListener('ended', () => {
-  console.log('[video] ended naturally');
   clearTimeout(videoHideTimer);
-  videoEl.classList.remove('active');
-  videoEl.src = '';
-  // videoEl.removeAttribute('src');
+  stopVideo();
 });
-
-// ── WebSocket raw message logging ─────────────────────────
-// Patch ws-client after it connects by monitoring all overlay:* events
-['video','follow','sub','raid','pokemon','spin'].forEach(type => {
-  window.addEventListener(`overlay:${type}`, e => {
-    console.log(`[ws] dispatched overlay:${type}`, e.detail);
-  });
-});
-
-// Also confirm the page loaded and WS URL
-console.log('[init] alerts.html loaded, expecting WS at ws://' + location.host);
-console.log('[init] video element display style (inline):', videoEl.style.display);
 </script>
 </body>
 </html>

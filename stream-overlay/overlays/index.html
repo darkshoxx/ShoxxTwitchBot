@@ -137,6 +137,7 @@
   }
   .test-btn:hover { background: var(--purple-dim); border-color: var(--purple); color: #c084fc; }
   .test-btn:active { transform: scale(.97); }
+  .test-btn.active { background: var(--purple-dim); border-color: var(--cyan); color: var(--cyan); box-shadow: var(--glow-cyan); }
 
   /* Status dot */
   .ws-status {
@@ -228,6 +229,43 @@
     </div>
   </div>
 
+  <!-- Notescam -->
+  <div class="overlay-card">
+    <div class="card-header">
+      <div class="card-icon">🐱</div>
+      <div class="card-title">Notescam Frame</div>
+    </div>
+    <div class="card-desc">Border frame for the notescam camera. Position is driven by layout state — toggled via Stream Deck or the buttons below.</div>
+    <div class="size-info">Recommended: 1920 × 1080 px</div>
+    <div class="obs-url" onclick="copyUrl(this, '/notescam')">
+      <span>http://localhost:3000/notescam</span>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+
+  <!-- Livesplit -->
+  <div class="overlay-card">
+    <div class="card-header">
+      <div class="card-icon">⏱</div>
+      <div class="card-title">LiveSplit Frame</div>
+    </div>
+    <div class="card-desc">Border frame for LiveSplit. Height auto-adjusts via the LiveSplit Server component (port 16834). Position driven by layout state.</div>
+    <div class="size-info">Recommended: 1920 × 1080 px</div>
+    <div class="obs-url" onclick="copyUrl(this, '/livesplit')">
+      <span>http://localhost:3000/livesplit</span>
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Layout toggles -->
+<div class="test-section">
+  <div class="section-title">Layout toggles</div>
+  <div class="btn-row">
+    <button class="test-btn toggle-btn" id="btn-notescam" onclick="toggle('notescam')">🐱 Notescam</button>
+    <button class="test-btn toggle-btn" id="btn-livesplit" onclick="toggle('livesplit')">⏱ LiveSplit</button>
+  </div>
 </div>
 
 <!-- Test panel -->
@@ -262,44 +300,25 @@ function copyUrl(el, path) {
   });
 }
 
-function fire(type) {
-  fetch(`/test/${type}`).catch(() => {});
+function fire(type) { fetch(`/test/${type}`).catch(() => {}); }
+
+function toggle(source) {
+  fetch(`/toggle/${source}`, { method: 'POST' }).catch(() => {});
 }
 
-// WebSocket connection status
-const dot   = document.getElementById('ws-dot');
-const label = document.getElementById('ws-label');
-
-window.addEventListener('overlay:connected', () => {
-  dot.classList.add('connected');
-  label.textContent = 'WebSocket connected';
+// Reflect layout state on toggle buttons
+window.addEventListener('overlay:layout', e => {
+  const { notescam, livesplit } = e.detail;
+  document.getElementById('btn-notescam').classList.toggle('active', notescam);
+  document.getElementById('btn-livesplit').classList.toggle('active', livesplit);
 });
 
-// Detect ws-client connected event
-const _orig = WebSocket.prototype.send;
-// Check for our custom connected event
-window.addEventListener('overlay:connected', () => {});
-// Simple fallback: try to detect WS state
-setInterval(() => {
-  // The ws-client script fires 'overlay:connected' on message type=connected
-  // We detect it here instead
-}, 500);
-</script>
+window.addEventListener('overlay:connected_layout', e => {
+  window.dispatchEvent(new CustomEvent('overlay:layout', { detail: e.detail }));
+});
 
-<script>
-// Override the ws-client to also update the indicator
-(function() {
-  const CHECK = setInterval(() => {
-    const el = document.getElementById('ws-dot');
-    if (!el) return;
-    // If we got here, the page loaded and ws-client is trying to connect
-    // We use a simple fetch as fallback
-    fetch('/test/ping').catch(() => {});
-    clearInterval(CHECK);
-  }, 100);
-})();
-
-window.addEventListener('overlay:connected', () => {
+// WS status indicator
+window.addEventListener('overlay:connected_layout', () => {
   document.getElementById('ws-dot').classList.add('connected');
   document.getElementById('ws-label').textContent = 'WebSocket connected — ready';
 });

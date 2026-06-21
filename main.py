@@ -7,7 +7,7 @@ import threading
 import time
 import webbrowser
 from typing import List
-
+# import subprocess
 import win32.win32gui as gui
 import win32com.client as the_client
 from dotenv import load_dotenv
@@ -19,6 +19,41 @@ from unidecode import unidecode
 import aiohttp
 
 OVERLAY_URL = "http://localhost:3000/event"
+
+def render_emotes(text: str, emotes: dict) -> str:
+    """
+    Replace emote character ranges in text with <img> tags.
+    emotes format from twitchAPI: { "emote_id": [(start, end), ...], ... }
+    Returns an HTML string safe to inject into the chat overlay.
+    """
+    if not emotes:
+        import html
+        return html.escape(text)
+ 
+    # Build list of (start, end, emote_id) sorted by start position
+    ranges = []
+    for emote_id, positions in emotes.items():
+        for start, end in positions:
+            try:
+                ranges.append((int(start), int(end), emote_id))
+            except ValueError as e:
+                print(e)
+    ranges.sort(key=lambda x: x[0])
+ 
+    import html
+    result = []
+    cursor = 0
+    for start, end, emote_id in ranges:
+        # Escape plain text before this emote
+        result.append(html.escape(text[cursor:start]))
+        # Emote image (1x size; change to 2.0 for HiDPI)
+        result.append(
+            f'<img src="https://static-cdn.jtvnw.net/emoticons/v2/{emote_id}'
+            f'/default/dark/1.0" class="emote" alt="{html.escape(text[start:end+1])}">'
+        )
+        cursor = end + 1
+    result.append(html.escape(text[cursor:]))
+    return ''.join(result)
 
 async def push_overlay_event(payload: dict):
     """Fire-and-forget POST to the local overlay server."""
@@ -494,7 +529,8 @@ class InheritedBot(Chat):
         await push_overlay_event({
             "type": "chat",
             "user": msg.user.name,
-            "text": msg.text,
+            "text": render_emotes(msg.text, getattr(msg, 'emotes', None) or {}),
+            "isHtml": True,
             "color": getattr(msg.user, 'color', None),
             "badges": list(msg.user.badges.keys()) if msg.user.badges else [],
         })
@@ -636,7 +672,8 @@ async def run():
 stop_event = asyncio.Event()
 bot_thread = None
 running = False
-
+node_process = None
+import subprocess
 
 def start_bot():
     global bot_thread
@@ -658,10 +695,17 @@ def run_bot():
     loop.close()
 
 def script_load(settings):
+    global node_process
+    server_dir = os.path.join(HERE, "stream-overlay")
+    node_process = subprocess.Popen(["node", "server.js"], cwd=server_dir)
     start_bot()
 
 def script_unload():
     stop_bot()
+    global node_process
+    if node_process:
+        node_process.terminate()
+        node_process.wait()
 
 if __name__ == "__main__" and not IN_OBS:
     asyncio.run(run())

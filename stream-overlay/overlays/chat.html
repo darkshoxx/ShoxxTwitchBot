@@ -109,6 +109,12 @@
     word-break: break-word;
     line-height: 1.4;
   }
+  .msg-text .emote {
+    height: 1.4em;
+    width: auto;
+    vertical-align: middle;
+    display: inline-block;
+  }
 
   /* Broadcaster highlight */
   .msg.broadcaster {
@@ -141,7 +147,7 @@ function userColor(name) {
   return `hsl(${hue % 360}, 70%, 65%)`;
 }
 
-function addMessage({ user, text, color, badges = [] }) {
+function addMessage({ user, text, color, badges = [], isHtml = false }) {
   // Remove old messages if over limit
   const msgs = wrap.querySelectorAll('.msg');
   if (msgs.length >= MAX_MESSAGES) {
@@ -165,7 +171,7 @@ function addMessage({ user, text, color, badges = [] }) {
     <div class="msg-avatar">${initials}</div>
     <div class="msg-body">
       <div class="msg-name">${escHtml(user)}${badgeHtml}</div>
-      <div class="msg-text">${escHtml(text)}</div>
+      <div class="msg-text">${isHtml ? text : escHtml(text)}</div>
     </div>
   `;
   wrap.appendChild(el);
@@ -184,9 +190,9 @@ window.addEventListener('overlay:chat', e => addMessage(e.detail));
 // ── Dev: seed a few demo messages on load ─────────────────
 const demos = [
   { user: 'darkshoxx',  text: 'Chat overlay is live 🎮', color: '#7c3aed', badges: ['broadcaster'] },
-  { user: 'CoolViewer', text: 'LUL that was amazing!!', color: '#00f5ff' },
-  { user: 'MystFan99',  text: 'pokemon gen3 let\'s go!!', color: '#f59e0b' },
-  { user: 'SpeedDemon', text: 'spin', color: '#34d399', badges: ['sub'] },
+  // { user: 'CoolViewer', text: 'LUL that was amazing!!', color: '#00f5ff' },
+  // { user: 'MystFan99',  text: 'pokemon gen3 let\'s go!!', color: '#f59e0b' },
+  // { user: 'SpeedDemon', text: 'spin', color: '#34d399', badges: ['sub'] },
 ];
 demos.forEach((d, i) => setTimeout(() => addMessage(d), i * 200));
 </script>
