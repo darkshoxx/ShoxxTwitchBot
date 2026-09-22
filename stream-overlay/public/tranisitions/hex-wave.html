@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; background: transparent; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+const W = 1920, H = 1080, CX = W/2, CY = H/2;
+const HEX_R = 80;          // hex cell radius — adjust for coarser/finer grid
+const WAVE_MS  = 900;      // time for wave to cross the screen
+const HOLD_MS  = 100;
+const SHRINK_MS = 900;
+const TOTAL_MS = WAVE_MS + HOLD_MS + SHRINK_MS;
+const CELL_ANIM_MS = 120;  // how long each individual cell takes to fill
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+function easeIn(t)  { return t * t * t; }
+
+// ── Build hex grid ────────────────────────────────────────
+const hexW = Math.sqrt(3) * HEX_R;
+const hexH = 2 * HEX_R;
+const cols = Math.ceil(W / hexW) + 2;
+const rows = Math.ceil(H / (hexH * 0.75)) + 2;
+
+const cells = [];
+let maxDist = 0;
+
+for (let row = -1; row < rows; row++) {
+  for (let col = -1; col < cols; col++) {
+    const cx = col * hexW + (row % 2 === 0 ? 0 : hexW / 2);
+    const cy = row * hexH * 0.75;
+    const dist = Math.sqrt((cx - CX) ** 2 + (cy - CY) ** 2);
+    if (dist > maxDist) maxDist = dist;
+    cells.push({ cx, cy, dist });
+  }
+}
+
+// Normalise: each cell gets a start time within [0, WAVE_MS - CELL_ANIM_MS]
+const waveWindow = WAVE_MS - CELL_ANIM_MS;
+cells.forEach(c => { c.startT = (c.dist / maxDist) * waveWindow; });
+
+// ── Draw one hex cell ─────────────────────────────────────
+function hexPath(cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i - Math.PI / 6;
+    i === 0
+      ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+      : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+  ctx.closePath();
+}
+
+// ── Main draw ─────────────────────────────────────────────
+function draw(ms) {
+  ctx.clearRect(0, 0, W, H);
+
+  for (const { cx, cy, dist, startT } of cells) {
+    let alpha = 0;
+
+    if (ms <= WAVE_MS + HOLD_MS) {
+      // Fill phase
+      const localT = ms - startT;
+      if (localT >= CELL_ANIM_MS) {
+        alpha = 1;
+      } else if (localT > 0) {
+        alpha = easeOut(localT / CELL_ANIM_MS);
+      }
+    } else {
+      // Retract phase — reverse the wave (outermost cells disappear first)
+      const retractMs = ms - WAVE_MS - HOLD_MS;
+      const retractStart = ((maxDist - dist) / maxDist) * waveWindow;
+      const localT = retractMs - retractStart;
+      if (localT <= 0) {
+        alpha = 1;
+      } else if (localT < CELL_ANIM_MS) {
+        alpha = easeIn(1 - localT / CELL_ANIM_MS);
+      }
+    }
+
+    if (alpha <= 0) continue;
+
+    // Colour: purple at centre, cyan at edges
+    const t = dist / maxDist;
+    const r = Math.round((1-t) * 124 + t * 0);
+    const g = Math.round((1-t) * 58  + t * 245);
+    const b = Math.round((1-t) * 237 + t * 255);
+
+    hexPath(cx, cy, HEX_R + 1);  // was HEX_R - 1
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.fill();
+
+    // if (alpha > 0.5) {
+    //   ctx.strokeStyle = `rgba(0,245,255,${(alpha - 0.5) * 0.4})`;
+    //   ctx.lineWidth = 1;
+    //   ctx.stroke();
+    // }
+  }
+}
+
+window.TOTAL_MS    = TOTAL_MS;
+window.GROW_END_MS = WAVE_MS + HOLD_MS / 2;
+window.renderFrame = draw;
+
+const isPuppeteer = navigator.webdriver;
+if (!isPuppeteer) {
+  let start = null;
+  function loop(ts) {
+    if (!start) start = ts;
+    const ms = ts - start;
+    draw(Math.min(ms, TOTAL_MS));
+    if (ms < TOTAL_MS) requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

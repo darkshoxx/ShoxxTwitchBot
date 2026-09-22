@@ -166,6 +166,7 @@ function addMessage({ user, text, color, badges = [], isHtml = false }) {
 
   const el = document.createElement('div');
   el.className = `msg${isBroadcaster ? ' broadcaster' : ''}`;
+  el.dataset.user = user.toLowerCase();
   el.style.setProperty('--user-color', c);
   el.innerHTML = `
     <div class="msg-avatar">${initials}</div>
@@ -186,6 +187,22 @@ function escHtml(str) {
 
 // ── WebSocket chat messages ───────────────────────────────
 window.addEventListener('overlay:chat', e => addMessage(e.detail));
+
+window.addEventListener('overlay:clearchat', () => {
+  wrap.querySelectorAll('.msg').forEach(el => {
+    el.classList.add('exiting');
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+  });
+});
+
+// after line 130, after the overlay:chat listener
+window.addEventListener('overlay:ban', e => {
+  const name = e.detail.user.toLowerCase();
+  wrap.querySelectorAll(`.msg[data-user="${name}"]`).forEach(el => {
+    el.classList.add('exiting');
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+  });
+});
 
 // ── Dev: seed a few demo messages on load ─────────────────
 const demos = [

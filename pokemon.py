@@ -28,7 +28,7 @@ poketypes = [
     "dragon",
     "dark",
     "fairy",
-    "unknown",
+    # "unknown",
     "shadow"
 ]
 

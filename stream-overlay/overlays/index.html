@@ -265,6 +265,8 @@
   <div class="btn-row">
     <button class="test-btn toggle-btn" id="btn-notescam" onclick="toggle('notescam')">🐱 Notescam</button>
     <button class="test-btn toggle-btn" id="btn-livesplit" onclick="toggle('livesplit')">⏱ LiveSplit</button>
+    <button class="test-btn" onclick="fire('ban')">🔨 Ban test</button>
+    <button class="test-btn" onclick="clearChat()">🗑 Clear chat</button>
   </div>
 </div>
 
@@ -288,6 +290,14 @@
 
 <script src="/js/ws-client.js"></script>
 <script>
+function clearChat() {
+  fetch('/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'clearchat' })
+  });
+}
+
 function copyUrl(el, path) {
   const url = `http://localhost:3000${path}`;
   navigator.clipboard.writeText(url).then(() => {

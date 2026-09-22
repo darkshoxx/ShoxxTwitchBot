@@ -219,3 +219,33 @@ async def play_me(index, scene_index: str, sleep_time=30):
     if src:
         await _push({"type": "video", "src": src, "duration": sleep_time})
 
+FILTER_SOURCE_NAME = "5 Facecam Import for Server"   # OBS source the filter is attached to
+FILTER_NAME = "Phase-E"               # name of the filter on that source
+
+FILTER_PARAMS = {
+    "cells_h":    {"type": "int",   "default": 160, "min": 1,   "max": 320},
+    "cells_v":    {"type": "int",   "default": 40,  "min": 1,   "max": 180},
+    "num_colours":{"type": "int",   "default": 4,   "min": 1,   "max": 20},
+    "tol_x":      {"type": "float", "default": 0.7, "min": 0.0, "max": 2.0},
+    "tol_y":      {"type": "float", "default": 0.7, "min": 0.0, "max": 2.0},
+    "tol_sat":    {"type": "float", "default": 0.1, "min": 0.0, "max": 1.0},
+    "dyn_sat":    {"type": "bool",  "default": True},
+    "dyn_val":    {"type": "bool",  "default": False},
+}
+
+async def set_filter_param(param: str, value):
+    """Push a single filter setting to OBS via websocket."""
+    from obswebsocket import obsws, requests as obs_req
+    OBS_PW = os.getenv("OBS_PW")
+    ws = obsws("localhost", 4455, OBS_PW)
+    ws.connect()
+    try:
+        settings = {param: value}
+        ws.call(obs_req.SetSourceFilterSettings(
+            sourceName=FILTER_SOURCE_NAME,
+            filterName=FILTER_NAME,
+            filterSettings=settings,
+            overlay=True,   # merge with existing settings, don't overwrite all
+        ))
+    finally:
+        ws.disconnect()

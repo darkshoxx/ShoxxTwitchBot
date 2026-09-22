@@ -209,7 +209,8 @@ app.get('/test/:type', (req, res) => {
     resub:   { type: 'sub',     user: 'OldFan',     months: 7 },
     pokemon: { type: 'pokemon', dex: Math.floor(Math.random()*1025)+1 },
     spin:    { type: 'spin' },
-    raid:    { type: 'raid',    user: 'BigStreamer', viewers: 42 },
+    raid: { type: 'raid', user: 'BigStreamer', viewers: 42 },
+    ban: { type: 'ban', user: 'TestViewer' }, // How on earth would that even work?
     layout_notescam:  { type: 'layout', notescam: true,  livesplit: false },
     layout_livesplit: { type: 'layout', notescam: false, livesplit: true  },
     layout_both:      { type: 'layout', notescam: true,  livesplit: true  },

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; background: transparent; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+/*
+  Timing (all in ms):
+    0       → GROW_END   : hex grows from centre to full coverage
+    GROW_END             : full coverage (this is the cut frame — mark this in OBS)
+    GROW_END → END       : hex shrinks away
+
+  The canvas background stays transparent throughout so webm+alpha works correctly.
+  The hex is filled with a cyan→purple radial gradient.
+*/
+
+const W = 1920, H = 1080;
+const CX = W / 2, CY = H / 2;
+// Minimum radius to guarantee all four corners are covered
+const MAX_R = Math.sqrt(CX * CX + CY * CY) + 10; // ~1105px
+
+const GROW_MS  = 600;   // grow phase duration
+const HOLD_MS  = 100;   // frames at full coverage (the cut lives here)
+const SHRINK_MS = 600;  // shrink phase duration
+const TOTAL_MS = GROW_MS + HOLD_MS + SHRINK_MS;
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// Ease in-out cubic
+function easeInOut(t) {
+  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+}
+
+function hexPath(cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i - Math.PI / 6;
+    const x = cx + r * Math.cos(a);
+    const y = cy + r * Math.sin(a);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function draw(ms) {
+  ctx.clearRect(0, 0, W, H);
+
+  let r;
+  if (ms <= GROW_MS) {
+    r = MAX_R * easeInOut(ms / GROW_MS);
+  } else if (ms <= GROW_MS + HOLD_MS) {
+    r = MAX_R;
+  } else {
+    const t = (ms - GROW_MS - HOLD_MS) / SHRINK_MS;
+    r = MAX_R * easeInOut(1 - t);
+  }
+
+  if (r <= 0) return;
+
+  // Radial gradient: cyan centre → purple edge
+  const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, r);
+  grad.addColorStop(0,   '#00f5ff');
+  grad.addColorStop(0.5, '#7c3aed');
+  grad.addColorStop(1,   '#4a1d96');
+
+  hexPath(CX, CY, r);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Thin glowing ring at the leading edge
+  if (r < MAX_R - 1) {
+    hexPath(CX, CY, r);
+    ctx.strokeStyle = 'rgba(0, 245, 255, 0.7)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+}
+
+// ── Exposed for Puppeteer frame-by-frame capture ──────────
+// Puppeteer calls window.renderFrame(ms) then screenshots.
+window.TOTAL_MS = TOTAL_MS;
+window.GROW_END_MS = GROW_MS + HOLD_MS / 2; // midpoint of hold = cut frame
+window.renderFrame = draw;
+
+// ── Live preview (ignored by Puppeteer) ──────────────────
+const isPuppeteer = navigator.webdriver;
+
+if (!isPuppeteer) {
+  let start = null;
+  function loop(ts) {
+    if (!start) start = ts;
+    const ms = ts - start;
+    draw(Math.min(ms, TOTAL_MS));
+    if (ms < TOTAL_MS) requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "stream-transitions",
+  "version": "1.0.0",
+  "scripts": {
+    "capture": "node capture.js",
+    "capture:keep": "node capture.js --keep-frames"
+  },
+  "dependencies": {
+    "puppeteer": "^22.15.0"
+  }
+}

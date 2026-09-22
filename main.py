@@ -15,6 +15,7 @@ from twitchAPI.chat import Chat, ChatCommand, ChatMessage, EventData
 from twitchAPI.oauth import UserAuthenticationStorageHelper, UserAuthenticator
 from twitchAPI.twitch import Twitch
 from twitchAPI.type import AuthScope, ChatEvent
+from websocket_module import FILTER_PARAMS, set_filter_param
 from unidecode import unidecode
 import aiohttp
 
@@ -155,8 +156,8 @@ auto_spin = False
 INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
 POKE_LOG = os.path.join(HERE, "pokelog.txt")
 TOKEN_FILE = os.path.join(HERE, "user_token.json")
-BAD_TERMS_START = ["aiviewersst","wantpopular", "wannamorevi", "topviewerss","bestviewers", "cheapviewer", "cheapfollow", "bestfollowe", "viewersstre", "estviewersm"] # ALL TERMS HAVE 11 CHARACTERS
-BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers", "op58.online", "eamboo.live", "vethespace)", "reamboo.org", "xadsxonline", "reamboo.com"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_TERMS_START = ["aiviewersst", "aiviewerstw", "wantpopular", "wannamorevi", "topviewerss","bestviewers", "cheapviewer", "cheapfollow", "bestfollowe", "viewersstre", "estviewersm"] # ALL TERMS HAVE 11 CHARACTERS
+BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers", "op58.online", "eamboo.live", "vethespace)", "reamboo.org", "xadsxonline", "reamboo.com", "wichmax.com"] # ALL TERMS HAVE 11 CHARACTERS
 BAD_WITH_APPENDAGE = [shoxxword + starter for shoxxword in ["darkshoxx", "@darkshoxx"] for starter in BAD_TERMS_START]
 BAN_TIMEOUT = 5
 # auto_spin = False
@@ -287,6 +288,7 @@ async def test_message_for_violations(bot: Chat, message: ChatMessage) -> bool:
                 to_ban.id,
                 "GET REKT"
                 )
+            await push_overlay_event({"type": "ban", "user": to_ban.name})
         return True
     return False
 
@@ -341,6 +343,67 @@ async def test_message_for_music_hints(msg: ChatMessage):
     if msg.text[:5] == "hints":
         await msg.reply(f"Here are the music hints:{MUSIC_HINTS}")
 
+
+async def test_message_for_filter(msg: ChatMessage):
+    text = msg.text.strip()
+    if text.lower() == "!ascii":
+        parts = []
+        for name, p in FILTER_PARAMS.items():
+            if p["type"] == "bool":
+                parts.append(f"{name}={'on' if p['default'] else 'off'}")
+            else:
+                parts.append(f"{name}={p['default']} [{p['min']}-{p['max']}]")
+        await msg.reply("ASCII filter params: " + "  |  ".join(parts))
+        return
+        # !asciidefault — reset everything
+    if text.lower() == "!asciidefault":
+        for name, p in FILTER_PARAMS.items():
+            await set_filter_param(name, p["default"])
+        await msg.reply("ASCII filter reset to defaults.")
+        return
+    # !filter variable value
+    if not text.lower().startswith("!filter "):
+        return
+    parts = text.split()
+    if len(parts) != 3:
+        await msg.reply("Usage: !filter <variable> <value>")
+        return
+
+    _, param, raw_value = parts
+    param = param.lower()
+
+    if param not in FILTER_PARAMS:
+        await msg.reply(f"Unknown param '{param}'. Use !ascii to see all params.")
+        return
+
+    p = FILTER_PARAMS[param]
+
+    # Parse and validate
+    try:
+        if p["type"] == "int":
+            value = int(raw_value)
+            if not (p["min"] <= value <= p["max"]):
+                await msg.reply(f"{param} must be between {p['min']} and {p['max']}.")
+                return
+        elif p["type"] == "float":
+            value = float(raw_value)
+            if not (p["min"] <= value <= p["max"]):
+                await msg.reply(f"{param} must be between {p['min']} and {p['max']}.")
+                return
+        elif p["type"] == "bool":
+            if raw_value.lower() in ("true", "on", "1", "yes"):
+                value = True
+            elif raw_value.lower() in ("false", "off", "0", "no"):
+                value = False
+            else:
+                await msg.reply(f"{param} must be on/off.")
+                return
+    except ValueError:
+        await msg.reply(f"Invalid value '{raw_value}' for {param}.")
+        return
+
+    await set_filter_param(param, value)
+    await msg.reply(f"ASCII filter: {param} set to {value}.")
 
 async def set_abort(set_to: bool):
     global ABORT
@@ -506,6 +569,7 @@ class InheritedBot(Chat):
         await test_message_for_spin(self, msg)
         await toggle_autospin(msg=msg)
         is_abort = await test_message_for_abort(msg)
+        await test_message_for_filter(msg)
         await test_message_for_song(msg)
         await test_message_for_music_hints(msg)
         await test_message_for_pokemon(msg)
@@ -523,14 +587,15 @@ class InheritedBot(Chat):
             print(
                 f"{msg.user.name} Sent an NAUGHTY message in {msg.room.name}!"
                 )
-        await push_overlay_event({
-            "type": "chat",
-            "user": msg.user.name,
-            "text": render_emotes(msg.text, getattr(msg, 'emotes', None) or {}),
-            "isHtml": True,
-            "color": getattr(msg.user, 'color', None),
-            "badges": list(msg.user.badges.keys()) if msg.user.badges else [],
-        })
+        if not is_invalid:
+                    await push_overlay_event({
+                        "type": "chat",
+                        "user": msg.user.name,
+                        "text": render_emotes(msg.text, getattr(msg, 'emotes', None) or {}),
+                        "isHtml": True,
+                        "color": getattr(msg.user, 'color', None),
+                        "badges": list(msg.user.badges.keys()) if msg.user.badges else [],
+                    })
 
 
 def kill_inactive_players(bot: InheritedBot):
