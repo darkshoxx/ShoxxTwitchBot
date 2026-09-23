@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bingo Board – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  /*
+    OBS: Add as Browser Source, ~400 × 420 px, transparent background.
+    Board is generated once on load from the label list — refresh to regenerate.
+  */
+  html, body {
+    width: 400px; background: transparent; overflow: hidden;
+  }
+
+  .board-header {
+    font-family: var(--font-display);
+    font-size: 11px; font-weight: 900;
+    letter-spacing: .25em; text-transform: uppercase;
+    color: var(--cyan); text-shadow: var(--glow-cyan);
+    text-align: center;
+    padding: 8px 0 10px;
+  }
+
+  /* ── 5×5 grid ── */
+  #bingo-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 3px;
+    padding: 0 4px 6px;
+  }
+
+  .cell {
+    aspect-ratio: 1;
+    background: rgba(20,23,32,.85);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    padding: 4px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.2;
+    transition: background .3s, border-color .3s, color .3s, box-shadow .3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* FREE space */
+  .cell.free {
+    background: rgba(124,58,237,.2);
+    border-color: var(--purple);
+    color: #c084fc;
+    font-weight: 700;
+    font-size: 8px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  /* Called — lights up */
+  .cell.called {
+    background: rgba(0,245,255,.12);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: inset 0 0 8px rgba(0,245,255,.15), var(--glow-cyan);
+  }
+  .cell.called::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(0,245,255,.07) 0%, transparent 60%);
+  }
+
+  /* Bingo line highlight */
+  .cell.bingo-line {
+    background: rgba(245,158,11,.18);
+    border-color: var(--amber);
+    color: var(--amber);
+    box-shadow: inset 0 0 10px rgba(245,158,11,.2), var(--glow-amber);
+  }
+</style>
+</head>
+<body>
+<div class="board-header">B I N G O</div>
+<div id="bingo-grid"></div>
+
+<script src="/js/ws-client.js"></script>
+<script>
+const GRID_SIZE = 5;
+let boardLabels = []; // 25 labels for this board (index 12 = FREE)
+let calledSet   = new Set();
+
+// ── Fisher-Yates shuffle ──────────────────────────────────
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── Generate board from label pool ───────────────────────
+function generateBoard(labels) {
+  const pool = shuffle(labels);
+  const picked = pool.slice(0, 24); // 24 + 1 FREE centre
+  // Insert FREE at index 12 (centre of 5×5)
+  picked.splice(12, 0, null);
+  boardLabels = picked;
+  renderGrid();
+}
+
+// ── Render ────────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById('bingo-grid');
+  grid.innerHTML = '';
+  boardLabels.forEach((label, i) => {
+    const el = document.createElement('div');
+    const isFree   = label === null;
+    const isCalled = !isFree && calledSet.has(label);
+    el.className = `cell${isFree ? ' free' : ''}${isCalled ? ' called' : ''}`;
+    el.textContent = isFree ? '★ FREE ★' : label;
+    el.dataset.index = i;
+    grid.appendChild(el);
+  });
+  checkBingo();
+}
+
+function updateCells() {
+  boardLabels.forEach((label, i) => {
+    const el = document.querySelector(`.cell[data-index="${i}"]`);
+    if (!el || label === null) return;
+    const isCalled = calledSet.has(label);
+    el.classList.toggle('called', isCalled);
+  });
+  checkBingo();
+}
+
+// ── Bingo line detection ──────────────────────────────────
+function getLines() {
+  const lines = [];
+  // Rows
+  for (let r = 0; r < 5; r++) lines.push([0,1,2,3,4].map(c => r*5+c));
+  // Cols
+  for (let c = 0; c < 5; c++) lines.push([0,1,2,3,4].map(r => r*5+c));
+  // Diagonals
+  lines.push([0,6,12,18,24]);
+  lines.push([4,8,12,16,20]);
+  return lines;
+}
+
+function checkBingo() {
+  // Remove existing bingo-line highlights
+  document.querySelectorAll('.cell.bingo-line').forEach(el => el.classList.remove('bingo-line'));
+
+  getLines().forEach(line => {
+    const complete = line.every(i => {
+      const label = boardLabels[i];
+      return label === null || calledSet.has(label); // FREE counts
+    });
+    if (complete) {
+      line.forEach(i => {
+        const el = document.querySelector(`.cell[data-index="${i}"]`);
+        if (el) el.classList.add('bingo-line');
+      });
+    }
+  });
+}
+
+// ── WebSocket ─────────────────────────────────────────────
+window.addEventListener('overlay:bingo', e => {
+  calledSet = new Set(e.detail.called);
+  if (boardLabels.length) { updateCells(); } else { generateBoard(e.detail.labels); }
+});
+
+// Init
+fetch('/bingo/state').then(r => r.json()).then(d => {
+  calledSet = new Set(d.called);
+  generateBoard(d.labels);
+});
+</script>
+</body>
+</html>

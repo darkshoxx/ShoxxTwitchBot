@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bingo Called – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  /*
+    OBS: Add as Browser Source, ~280 × 400 px, transparent background.
+    Place in the bingo scene at bottom-centre-right.
+  */
+  html, body {
+    width: 280px; min-height: 400px;
+    background: transparent; overflow: hidden;
+  }
+
+#called-root {
+  padding: 8px 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 4px;
+  row-gap: 0;
+}
+
+.called-header {
+  grid-column: 1 / -1;  /* span both columns */
+  font-family: var(--font-display);
+  font-size: 9px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 10px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+}
+
+  .called-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px;
+    animation: itemIn 0.3s var(--ease-out-expo) both;
+  }
+  @keyframes itemIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .called-item.removing {
+    animation: itemOut 0.25s ease-in both;
+  }
+  @keyframes itemOut {
+    to { opacity: 0; transform: translateX(-8px); height: 0; padding: 0; margin: 0; }
+  }
+
+  .called-bullet {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--cyan);
+    box-shadow: var(--glow-cyan);
+    animation: bulletPulse 2s ease-in-out infinite alternate;
+  }
+  /* Stagger pulse so they don't all blink together */
+  .called-item:nth-child(2n)   .called-bullet { animation-delay: .3s; }
+  .called-item:nth-child(3n)   .called-bullet { animation-delay: .6s; }
+  .called-item:nth-child(4n)   .called-bullet { animation-delay: .9s; }
+  @keyframes bulletPulse {
+    from { opacity: 1; }
+    to   { opacity: .3; }
+  }
+
+  .called-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .empty-state {
+    font-family: var(--font-mono);
+    font-size: 11px; color: var(--text-muted);
+    text-align: center; padding: 20px 10px;
+    letter-spacing: .05em;
+  }
+</style>
+</head>
+<body>
+<div id="called-root">
+  <div class="called-header">Called Squares</div>
+  <div class="empty-state" id="empty">No squares called yet</div>
+</div>
+
+<script src="/js/ws-client.js"></script>
+<script>
+const root  = document.getElementById('called-root');
+const empty = document.getElementById('empty');
+let currentCalled = [];
+
+const MAX_HEIGHT = 400; // match your OBS browser source height in px
+function applyDensity() {
+  const items = [...root.querySelectorAll('.called-item')];
+  if (!items.length) return;
+
+  const levels = [
+    { padding: '5px 10px', fontSize: '12px', bulletSize: '6px' },
+    { padding: '4px 10px', fontSize: '11px', bulletSize: '5px' },
+    { padding: '3px 8px',  fontSize: '10px', bulletSize: '4px' },
+    { padding: '2px 8px',  fontSize: '9px',  bulletSize: '4px' },
+    { padding: '1px 6px',  fontSize: '8px',  bulletSize: '3px' },
+    { padding: '0px 6px',  fontSize: '7px',  bulletSize: '3px' },
+  ];
+
+  for (const level of levels) {
+    // Apply this level
+    items.forEach(el => {
+      el.style.padding = level.padding;
+      el.querySelector('.called-text').style.fontSize = level.fontSize;
+    });
+    root.querySelectorAll('.called-bullet').forEach(el => {
+      el.style.width = level.bulletSize;
+      el.style.height = level.bulletSize;
+    });
+
+    // Measure after applying — use rAF to ensure layout is recalculated
+    // We do this synchronously since we're iterating levels anyway;
+    // a forced reflow via scrollHeight is accurate enough here
+    const currentHeight = root.scrollHeight;
+    if (currentHeight <= MAX_HEIGHT) return; // fits, done
+  }
+  // If we exhausted all levels and still overflow, the last level stays
+}
+
+function sync(newCalled) {
+  const added   = newCalled.filter(l => !currentCalled.includes(l));
+  const removed = currentCalled.filter(l => !newCalled.includes(l));
+
+  removed.forEach(label => {
+    const el = root.querySelector(`[data-label="${CSS.escape(label)}"]`);
+    if (!el) return;
+    el.classList.add('removing');
+    el.addEventListener('animationend', () => { el.remove(); applyDensity(); }, { once: true });
+  });
+
+  added.forEach(label => {
+    const el = document.createElement('div');
+    el.className = 'called-item';
+    el.dataset.label = label;
+    el.innerHTML = `<div class="called-bullet"></div><div class="called-text">${escHtml(label)}</div>`;
+    root.appendChild(el);
+  });
+
+  currentCalled = [...newCalled];
+  empty.style.display = currentCalled.length ? 'none' : 'block';
+  applyDensity();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.addEventListener('overlay:bingo', e => sync(e.detail.called));
+
+fetch('/bingo/state').then(r => r.json()).then(d => sync(d.called));
+</script>
+</body>
+</html>

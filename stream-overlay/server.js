@@ -25,8 +25,35 @@ const server = http.createServer(app);
 const wss    = new WebSocketServer({ server });
 const PORT   = 3000;
 
+const fs = require('fs');
+
 // ── Layout state (single source of truth) ────────────────
 const layout = { notescam: false, livesplit: false };
+
+// ── Bingo state ───────────────────────────────────────────
+const LABELS_FILE = path.join(__dirname, 'public', 'assets', 'bingo-labels.txt');
+
+function loadLabels() {
+  try {
+    return fs.readFileSync(LABELS_FILE, 'utf8')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+  } catch (_) { return []; }
+}
+
+const bingo = {
+  labels: loadLabels(),   // all possible labels
+  called: new Set(),      // labels currently toggled on
+};
+
+function bingoSnapshot() {
+  return {
+    type: 'bingo',
+    labels: bingo.labels,
+    called: [...bingo.called],
+  };
+}
 
 // ── OBS connection ────────────────────────────────────────
 let obs = null;
@@ -110,7 +137,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const overlayDir = path.join(__dirname, 'overlays');
-['webcam','background','alerts','chat','hud','notescam','livesplit', 'border-4x3', 'border-16x9'].forEach(name => {
+['webcam','background','alerts','chat','hud','notescam','livesplit','border-4x3','border-16x9','bingo-plugboard','bingo-called','bingo-board'].forEach(name => {
   app.get(`/${name}`, (_req, res) =>
     res.sendFile(path.join(overlayDir, `${name}.html`))
   );
@@ -124,9 +151,9 @@ function broadcast(payload) {
 }
 
 wss.on('connection', ws => {
-  // Send current layout state immediately on connect so overlays initialise correctly
   ws.send(JSON.stringify({ type: 'connected' }));
   ws.send(JSON.stringify({ type: 'layout', ...layout }));
+  ws.send(JSON.stringify(bingoSnapshot()));
 });
 
 // ── /event ────────────────────────────────────────────────
@@ -199,6 +226,52 @@ app.get('/livesplit', (_req, res) => {
   client.on('timeout', finish);
   client.on('close',   () => { if (!res.headersSent) finish(); });
   client.on('error',   () => { if (!res.headersSent) res.json({}); });
+});
+
+// ── Bingo endpoints ───────────────────────────────────────
+
+// Toggle a single label on/off
+app.post('/bingo/toggle', (req, res) => {
+  const { label } = req.body;
+  if (!label || !bingo.labels.includes(label))
+    return res.status(400).json({ error: 'Unknown label' });
+  if (bingo.called.has(label)) bingo.called.delete(label);
+  else bingo.called.add(label);
+  broadcast(bingoSnapshot());
+  res.json({ ok: true, called: [...bingo.called] });
+});
+
+// Clear all called labels
+app.post('/bingo/clear', (_req, res) => {
+  bingo.called.clear();
+  broadcast(bingoSnapshot());
+  res.json({ ok: true });
+});
+
+// Reload labels file (if you edit it mid-stream)
+app.post('/bingo/reload', (_req, res) => {
+  bingo.labels = loadLabels();
+  broadcast(bingoSnapshot());
+  res.json({ ok: true, count: bingo.labels.length });
+});
+
+// Current state snapshot (for page init via HTTP)
+app.get('/bingo/state', (_req, res) => res.json(bingoSnapshot()));
+
+// Randomly call one uncalled label
+app.post('/bingo/random', (_req, res) => {
+  const uncalled = bingo.labels.filter(l => !bingo.called.has(l));
+  if (!uncalled.length) return res.json({ ok: false, reason: 'all called' });
+  const pick = uncalled[Math.floor(Math.random() * uncalled.length)];
+  bingo.called.add(pick);
+  broadcast(bingoSnapshot());
+  res.json({ ok: true, picked: pick });
+});
+
+// Trigger bingo alarm
+app.post('/bingo/bingo', (_req, res) => {
+  broadcast({ type: 'bingo_alarm' });
+  res.json({ ok: true });
 });
 
 // ── Dev helpers ───────────────────────────────────────────

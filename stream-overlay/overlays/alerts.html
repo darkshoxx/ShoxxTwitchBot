@@ -301,6 +301,15 @@ window.addEventListener('overlay:sub',     e => alertSub(e.detail));
 window.addEventListener('overlay:raid',    e => alertRaid(e.detail));
 window.addEventListener('overlay:pokemon', e => alertPokemon(e.detail));
 window.addEventListener('overlay:spin',    e => alertSpin(e.detail));
+window.addEventListener('overlay:bingo_alarm', () => {
+  const src = '/assets/videos/bingo.mp4';
+  clearTimeout(videoHideTimer);
+  ck.stop(); // no chroma key needed for bingo video
+  videoEl.src = src;
+  videoEl.classList.add('active');
+  videoEl.play().catch(() => {});
+  // auto-hide when the video ends naturally
+});
 
 // ── Video player with chroma key ─────────────────────────
 const videoEl = document.getElementById('video-player');

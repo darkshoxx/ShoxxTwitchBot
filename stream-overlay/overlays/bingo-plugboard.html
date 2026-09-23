@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bingo Plugboard – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html, body {
+    min-height: 100vh; width: 100vw;
+    background: var(--void);
+    overflow: auto;
+    font-family: var(--font-body);
+  }
+  body { padding: 32px; box-sizing: border-box; }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 900;
+    letter-spacing: .12em; text-transform: uppercase;
+    color: var(--cyan); text-shadow: var(--glow-cyan);
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-family: var(--font-mono);
+    font-size: 11px; color: var(--text-muted);
+    letter-spacing: .1em; margin-bottom: 28px;
+  }
+
+  /* ── Top action bar ── */
+  .action-bar {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    margin-bottom: 28px; align-items: center;
+  }
+  .btn {
+    font-family: var(--font-display);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase;
+    padding: 9px 20px; border-radius: var(--r-sm);
+    border: 1px solid; cursor: pointer;
+    transition: all .15s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-danger  { background: rgba(239,68,68,.12); border-color: var(--danger); color: var(--danger); }
+  .btn-danger:hover  { background: rgba(239,68,68,.25); }
+  .btn-bingo   { background: rgba(245,158,11,.12); border-color: var(--amber); color: var(--amber); box-shadow: var(--glow-amber); }
+  .btn-bingo:hover   { background: rgba(245,158,11,.25); }
+  .btn-random  { background: rgba(124,58,237,.12); border-color: var(--purple); color: #c084fc; }
+  .btn-random:hover  { background: rgba(124,58,237,.25); }
+  .btn-reload  { background: rgba(0,245,255,.08); border-color: var(--border); color: var(--text-muted); }
+  .btn-reload:hover  { border-color: var(--cyan); color: var(--cyan); }
+
+  .random-controls {
+    display: flex; align-items: center; gap: 8px;
+    margin-left: auto;
+  }
+  .random-controls label {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  }
+  .random-controls input[type=number] {
+    width: 60px; padding: 6px 8px;
+    background: var(--elevated); border: 1px solid var(--border);
+    border-radius: var(--r-sm); color: var(--text);
+    font-family: var(--font-mono); font-size: 12px;
+  }
+
+  .called-count {
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--text-muted); padding: 8px 0;
+    margin-bottom: 4px;
+  }
+  .called-count span { color: var(--cyan); font-weight: 700; }
+
+  /* ── Toggle grid ── */
+  .toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+  }
+
+  .toggle-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    user-select: none;
+  }
+  .toggle-item:hover { border-color: var(--cyan); }
+  .toggle-item.called {
+    background: rgba(0,245,255,.08);
+    border-color: var(--cyan);
+    box-shadow: var(--glow-cyan);
+  }
+
+  /* Custom checkbox */
+  .toggle-box {
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+    font-size: 12px;
+  }
+  .toggle-item.called .toggle-box {
+    background: var(--cyan); border-color: var(--cyan);
+    color: var(--void);
+  }
+
+  .toggle-label {
+    font-size: 13px; color: var(--text); line-height: 1.3;
+    flex: 1;
+  }
+  .toggle-item.called .toggle-label { color: var(--cyan); }
+
+  /* ── Auto-draw status ── */
+  #auto-status {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--amber); margin-left: 8px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<h1>Bingo Plugboard</h1>
+<div class="subtitle">Toggle squares as they're called · state syncs live to all overlays</div>
+
+<div class="action-bar">
+  <button class="btn btn-danger"  onclick="clearAll()">✕ Clear All</button>
+  <button class="btn btn-bingo"   onclick="triggerBingo()">★ BINGO!</button>
+  <button class="btn btn-random"  onclick="startAutoDraw()" id="btn-auto">▶ Auto Draw</button>
+  <button class="btn btn-reload"  onclick="reloadLabels()">↺ Reload Labels</button>
+  <div class="random-controls">
+    <label>Delay (s)</label>
+    <input type="number" id="draw-delay" value="5" min="1" max="60">
+  </div>
+  <span id="auto-status">Drawing…</span>
+</div>
+
+<div class="called-count">Called: <span id="called-count">0</span> / <span id="total-count">0</span></div>
+
+<div class="toggle-grid" id="toggle-grid"></div>
+
+<script src="/js/ws-client.js"></script>
+<script>
+let labels  = [];
+let called  = new Set();
+let autoTimer = null;
+
+// ── Build UI ──────────────────────────────────────────────
+function render() {
+  const grid = document.getElementById('toggle-grid');
+  grid.innerHTML = '';
+  labels.forEach(label => {
+    const isCalled = called.has(label);
+    const el = document.createElement('div');
+    el.className = `toggle-item${isCalled ? ' called' : ''}`;
+    el.dataset.label = label;
+    el.innerHTML = `
+      <div class="toggle-box">${isCalled ? '✓' : ''}</div>
+      <div class="toggle-label">${escHtml(label)}</div>
+    `;
+    el.addEventListener('click', () => toggle(label));
+    grid.appendChild(el);
+  });
+  document.getElementById('called-count').textContent = called.size;
+  document.getElementById('total-count').textContent  = labels.length;
+}
+
+function updateItem(label) {
+  const el = document.querySelector(`.toggle-item[data-label="${CSS.escape(label)}"]`);
+  if (!el) return;
+  const isCalled = called.has(label);
+  el.classList.toggle('called', isCalled);
+  el.querySelector('.toggle-box').textContent = isCalled ? '✓' : '';
+  document.getElementById('called-count').textContent = called.size;
+}
+
+// ── Actions ───────────────────────────────────────────────
+async function toggle(label) {
+  await fetch('/bingo/toggle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label }),
+  });
+}
+
+async function clearAll() {
+  if (!confirm('Clear all called squares?')) return;
+  await fetch('/bingo/clear', { method: 'POST' });
+}
+
+async function triggerBingo() {
+  await fetch('/bingo/bingo', { method: 'POST' });
+}
+
+async function reloadLabels() {
+  await fetch('/bingo/reload', { method: 'POST' });
+}
+
+function startAutoDraw() {
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    document.getElementById('btn-auto').textContent = '▶ Auto Draw';
+    document.getElementById('auto-status').style.display = 'none';
+    return;
+  }
+  const delay = parseInt(document.getElementById('draw-delay').value, 10) * 1000;
+  document.getElementById('btn-auto').textContent = '■ Stop';
+  document.getElementById('auto-status').style.display = 'inline';
+
+  async function drawOne() {
+    const res = await fetch('/bingo/random', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      document.getElementById('btn-auto').textContent = '▶ Auto Draw';
+      document.getElementById('auto-status').style.display = 'none';
+    }
+  }
+  drawOne();
+  autoTimer = setInterval(drawOne, delay);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── WebSocket sync ────────────────────────────────────────
+window.addEventListener('overlay:bingo', e => {
+  const prev = called;
+  labels = e.detail.labels;
+  called = new Set(e.detail.called);
+
+  // Full re-render only if label list changed, otherwise patch
+  if (labels.length !== document.querySelectorAll('.toggle-item').length) {
+    render();
+  } else {
+    labels.forEach(l => { if (prev.has(l) !== called.has(l)) updateItem(l); });
+    document.getElementById('called-count').textContent = called.size;
+  }
+});
+
+// Init from HTTP on load (before WS fires)
+fetch('/bingo/state').then(r => r.json()).then(data => {
+  labels = data.labels;
+  called = new Set(data.called);
+  render();
+});
+</script>
+</body>
+</html>
