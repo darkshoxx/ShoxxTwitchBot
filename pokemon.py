@@ -28,31 +28,33 @@ poketypes = [
     "dragon",
     "dark",
     "fairy",
-    # "unknown",
     "shadow"
 ]
 
 dex = 22
 
 
-async def get_pokemon_type_list(poke_type):
-    base_url = "https://pokeapi.co/api/v2/type/"
-    full_url = base_url + poke_type
-    poke_type_request = await asyncio.to_thread(requests.get, full_url)
-    type_types = poke_type_request.json()
-
-    my_list = []
-    for type_pokemon in type_types["pokemon"]:
-        type_pokemon_url = type_pokemon['pokemon']['url']
-        type_pokemon_request = await asyncio.to_thread(
-            requests.get,
-            type_pokemon_url,
-            timeout=3
-            )
-        type_pokemon_json = type_pokemon_request.json()
-        if type_pokemon_json['id'] < 1026:
-            my_list.append(int(type_pokemon_json['id']))
-    return my_list
+async def get_pokemon_type_list(poke_type: str):
+    """Fetches list of Dex IDs for a given type in a single fast HTTP call."""
+    base_url = f"https://pokeapi.co/api/v2/type/{poke_type.lower().strip()}"
+    try:
+        response = await asyncio.to_thread(requests.get, base_url, timeout=5)
+        if response.status_code != 200:
+            print(f"[POKEMON ERROR LOG] PokéAPI returned status {response.status_code}")
+            return []
+            
+        data = response.json()
+        my_list = []
+        for entry in data.get("pokemon", []):
+            url = entry['pokemon']['url']
+            # Parse ID directly from URL string (e.g., 'https://pokeapi.co/api/v2/pokemon/25/')
+            poke_id = int(url.rstrip("/").split("/")[-1])
+            if poke_id < 1026:
+                my_list.append(poke_id)
+        return my_list
+    except Exception as exc:
+        print(f"[POKEMON ERROR LOG] Failed to fetch type list for '{poke_type}': {exc}")
+        return []
 
 
 def generate_question_video(dex):

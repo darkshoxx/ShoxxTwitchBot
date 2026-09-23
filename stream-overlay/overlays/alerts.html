@@ -184,6 +184,7 @@
 <script src="/js/chromakey.js"></script>
 <script src="/js/ws-client.js"></script>
 <script>
+console.log('[HTML LOG] Alerts overlay script loaded and initializing...');
 const root = document.getElementById('alert-root');
 const DURATION = 6000; // ms visible
 
@@ -192,21 +193,34 @@ const queue = [];
 let showing = false;
 
 function enqueue(fn) {
+  console.log('[HTML LOG] Queueing alert task. Current queue length prior:', queue.length);
   queue.push(fn);
-  if (!showing) processQueue();
+  if (!showing) {
+    console.log('[HTML LOG] Queue worker is idle. Processing queue immediately...');
+    processQueue();
+  } else {
+    console.log('[HTML LOG] Queue worker is currently showing an alert. Item queued.');
+  }
 }
 
 function processQueue() {
-  if (!queue.length) { showing = false; return; }
+  if (!queue.length) { 
+    console.log('[HTML LOG] Queue emptied. Setting showing = false.');
+    showing = false; 
+    return; 
+  }
   showing = true;
   const fn = queue.shift();
+  console.log('[HTML LOG] Processing next queued alert item. Remaining in queue:', queue.length);
   fn(() => {
+    console.log('[HTML LOG] Alert display completed. Scheduling next item check in 300ms...');
     setTimeout(processQueue, 300);
   });
 }
 
 // ── Build & show a card ───────────────────────────────────
 function showAlert({ type, iconHtml, label, title, sub, duration = DURATION }) {
+  console.log(`[HTML LOG] Showing card: type=${type}, title="${title}", duration=${duration}ms`);
   return new Promise(resolve => {
     const card = document.createElement('div');
     card.className = `alert-card alert-${type}`;
@@ -222,20 +236,35 @@ function showAlert({ type, iconHtml, label, title, sub, duration = DURATION }) {
       <div class="alert-timer"></div>
     `;
     root.appendChild(card);
+    console.log('[HTML LOG] Appended alert card to DOM.');
 
     // Auto-dismiss
-    const dismissTimer = setTimeout(() => dismiss(card, resolve), duration);
-    card.addEventListener('click', () => { clearTimeout(dismissTimer); dismiss(card, resolve); });
+    const dismissTimer = setTimeout(() => {
+      console.log(`[HTML LOG] Alert duration (${duration}ms) expired. Auto-dismissing: "${title}"`);
+      dismiss(card, resolve);
+    }, duration);
+
+    card.addEventListener('click', () => {
+      console.log(`[HTML LOG] Alert card clicked manually: "${title}". Clearing timer and dismissing.`);
+      clearTimeout(dismissTimer); 
+      dismiss(card, resolve); 
+    });
   });
 }
 
 function dismiss(card, cb) {
+  console.log('[HTML LOG] Dismissing alert card element...');
   card.classList.add('exiting');
-  card.addEventListener('animationend', () => { card.remove(); cb?.(); }, { once: true });
+  card.addEventListener('animationend', () => { 
+    console.log('[HTML LOG] Exit animation complete. Removing card element from DOM.');
+    card.remove(); 
+    cb?.(); 
+  }, { once: true });
 }
 
 // ── Alert type handlers ───────────────────────────────────
 function alertFollow(detail) {
+  console.log('[HTML LOG] alertFollow triggered with detail:', detail);
   enqueue(done => showAlert({
     type: 'follow',
     iconHtml: '♡',
@@ -246,6 +275,7 @@ function alertFollow(detail) {
 }
 
 function alertSub(detail) {
+  console.log('[HTML LOG] alertSub triggered with detail:', detail);
   const resub = detail.months > 1;
   enqueue(done => showAlert({
     type: 'sub-event',
@@ -260,6 +290,7 @@ function alertSub(detail) {
 }
 
 function alertRaid(detail) {
+  console.log('[HTML LOG] alertRaid triggered with detail:', detail);
   enqueue(done => showAlert({
     type: 'raid',
     iconHtml: '⚔',
@@ -271,6 +302,7 @@ function alertRaid(detail) {
 }
 
 function alertPokemon(detail) {
+  console.log('[HTML LOG] alertPokemon triggered with detail:', detail);
   const dex = detail.dex;
   const padded = String(dex).padStart(3, '0');
   const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dex}.png`;
@@ -285,6 +317,7 @@ function alertPokemon(detail) {
 }
 
 function alertSpin(detail) {
+  console.log('[HTML LOG] alertSpin triggered with detail:', detail);
   const user = detail.user || 'Someone';
   enqueue(done => showAlert({
     type: 'spin',
@@ -296,18 +329,23 @@ function alertSpin(detail) {
 }
 
 // ── Wire up WebSocket events ──────────────────────────────
-window.addEventListener('overlay:follow',  e => alertFollow(e.detail));
-window.addEventListener('overlay:sub',     e => alertSub(e.detail));
-window.addEventListener('overlay:raid',    e => alertRaid(e.detail));
-window.addEventListener('overlay:pokemon', e => alertPokemon(e.detail));
-window.addEventListener('overlay:spin',    e => alertSpin(e.detail));
+window.addEventListener('overlay:follow',  e => { console.log('[WS EVENT LOG] Event: overlay:follow'); alertFollow(e.detail); });
+window.addEventListener('overlay:sub',     e => { console.log('[WS EVENT LOG] Event: overlay:sub'); alertSub(e.detail); });
+window.addEventListener('overlay:raid',    e => { console.log('[WS EVENT LOG] Event: overlay:raid'); alertRaid(e.detail); });
+window.addEventListener('overlay:pokemon', e => { console.log('[WS EVENT LOG] Event: overlay:pokemon'); alertPokemon(e.detail); });
+window.addEventListener('overlay:spin',    e => { console.log('[WS EVENT LOG] Event: overlay:spin'); alertSpin(e.detail); });
 window.addEventListener('overlay:bingo_alarm', () => {
+  console.log('[WS EVENT LOG] Event: overlay:bingo_alarm');
   const src = '/assets/videos/bingo.mp4';
   clearTimeout(videoHideTimer);
   ck.stop(); // no chroma key needed for bingo video
   videoEl.src = src;
   videoEl.classList.add('active');
-  videoEl.play().catch(() => {});
+  videoEl.play().then(() => {
+    console.log('[VIDEO LOG] Playing bingo alarm video successfully.');
+  }).catch(err => {
+    console.error('[VIDEO ERROR LOG] Failed playing bingo alarm video:', err);
+  });
   // auto-hide when the video ends naturally
 });
 
@@ -327,39 +365,58 @@ const CHROMA_KEYS = [
 
 const ck = ChromaKey(videoEl, ChromaKey.BLACK);
 ck.start();
+console.log('[CHROMAKEY LOG] ChromaKey instance created and loop started.');
 
 function getChromaKey(src) {
   const match = CHROMA_KEYS.find(c => src.includes(c.match));
+  console.log(`[CHROMAKEY LOG] Matching key for src="${src}":`, match ? match.key : 'None (Disabled)');
   return match ? match.key : null; // null = no chroma key needed
 }
 
 function stopVideo() {
+  console.log('[VIDEO LOG] Stopping video and resetting state.');
   videoEl.classList.remove('active');
   videoEl.pause();
   videoEl.removeAttribute('src');
 }
 
 window.addEventListener('overlay:video', e => {
+  console.log('[WS EVENT LOG] Event: overlay:video received detail:', e.detail);
   const { src, duration = 30 } = e.detail;
   clearTimeout(videoHideTimer);
 
   const keyColor = getChromaKey(src);
   if (keyColor) {
+      console.log('[CHROMAKEY LOG] Setting key color filter:', keyColor);
       ck.setKey(keyColor);
-    } else {
+  } else {
+      console.log('[CHROMAKEY LOG] Disabling key color filter (threshold: -1)');
       ck.setKey({ threshold: -1 }); // Disables keying
-    }
-    ck.start(); // Always run the canvas
+  }
+  ck.start(); // Always run the canvas
 
+  console.log(`[VIDEO LOG] Setting video.src = "${src}" (Duration timeout: ${duration}s)`);
   videoEl.src = src;
   videoEl.classList.add('active');
-  videoEl.play().catch(() => {});
-  videoHideTimer = setTimeout(stopVideo, duration * 1000);
+  videoEl.play().then(() => {
+    console.log('[VIDEO LOG] Video playback initiated successfully.');
+  }).catch(err => {
+    console.error('[VIDEO ERROR LOG] Video play() failed:', err);
+  });
+  videoHideTimer = setTimeout(() => {
+    console.log(`[VIDEO LOG] Video duration timer (${duration}s) elapsed. Stopping video.`);
+    stopVideo();
+  }, duration * 1000);
 });
 
 videoEl.addEventListener('ended', () => {
+  console.log('[VIDEO LOG] Video playback trigger event: "ended" fired.');
   clearTimeout(videoHideTimer);
   stopVideo();
+});
+
+videoEl.addEventListener('error', (err) => {
+  console.error('[VIDEO ERROR LOG] Video element error encountered:', err, videoEl.error);
 });
 </script>
 </body>
