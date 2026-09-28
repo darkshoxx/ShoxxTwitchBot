@@ -31,7 +31,14 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-    display: block;
+    display: none;
+  }
+
+  #video-container canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
   }
 
   /* ── Framed Mode (Tom Scott & Bingo) ── */
@@ -265,8 +272,9 @@ const root = document.getElementById('alert-root');
 const DURATION = 6000; // ms visible
 
 // ── Volume Settings ───────────────────────────────────────
-const FRAMED_VIDEO_VOLUME = 0.25;  // 25% volume for Tom Scott & Bingo
-const DEFAULT_VIDEO_VOLUME = 0.80; // 80% volume for standard alerts
+const FRAMED_VIDEO_VOLUME  = 0.25;  // Tom Scott & Bingo
+const POKEMON_VIDEO_VOLUME = 0.40;  // Pokemon videos
+const DEFAULT_VIDEO_VOLUME = 0.80;  // OOT, Loom, etc.
 
 // ── Alert queue ───────────────────────────────────────────
 const queue = [];
@@ -390,7 +398,7 @@ function getChromaKey(src) {
 function isFramedVideo(src) {
   if (!src) return false;
   const lower = src.toLowerCase();
-  return lower.includes('tomscott') || lower.includes('bingo');
+  return lower.includes('tomscott') || lower.includes('bingo') || lower.includes('pokemon');
 }
 
 function playAlertVideo(src, durationSec = 30) {
@@ -398,17 +406,25 @@ function playAlertVideo(src, durationSec = 30) {
   clearInterval(fadeInterval);
 
   const framed = isFramedVideo(src);
-  const targetVolume = framed ? FRAMED_VIDEO_VOLUME : DEFAULT_VIDEO_VOLUME;
+  const lower  = src.toLowerCase();
+  const targetVolume = lower.includes('pokemon') ? POKEMON_VIDEO_VOLUME
+                     : framed                    ? FRAMED_VIDEO_VOLUME
+                     :                             DEFAULT_VIDEO_VOLUME;
 
   if (framed) {
     containerEl.classList.remove('unframed');
     containerEl.classList.add('framed');
-    labelEl.textContent = src.toLowerCase().includes('bingo') ? 'BINGO ALARM' : 'TOM SCOTT';
-    ck.stop(); // Chroma key disabled for framed videos
+    labelEl.textContent = lower.includes('bingo')   ? 'BINGO ALARM'
+                        : lower.includes('pokemon') ? "WHO'S THAT POKÉMON?"
+                        :                             'TOM SCOTT';
+    ck.stop();
+    ck.canvas.style.display = 'none';
+    videoEl.style.display   = 'block';
   } else {
     containerEl.classList.remove('framed');
     containerEl.classList.add('unframed');
-
+    videoEl.style.display        = 'none';
+    ck.canvas.style.display      = 'block';
     const keyColor = getChromaKey(src);
     if (keyColor) {
       ck.setKey(keyColor);
@@ -418,14 +434,12 @@ function playAlertVideo(src, durationSec = 30) {
     ck.start();
   }
 
-  videoEl.src = src;
-  videoEl.volume = 0; // Start muted for smooth audio fade-in
-  containerEl.classList.add('active'); // Triggers CSS opacity fade-in
+  videoEl.src    = src;
+  videoEl.volume = 0;
+  containerEl.classList.add('active');
 
   videoEl.play().then(() => {
     console.log(`[VIDEO LOG] Playing video (${framed ? 'Framed' : 'Unframed'}): ${src}`);
-    
-    // Smooth volume fade-in over 400ms
     let currentVol = 0;
     const step = targetVolume / 10;
     fadeInterval = setInterval(() => {
@@ -433,15 +447,12 @@ function playAlertVideo(src, durationSec = 30) {
       videoEl.volume = currentVol;
       if (currentVol >= targetVolume) clearInterval(fadeInterval);
     }, 40);
-
   }).catch(err => {
     console.error('[VIDEO ERROR LOG] Video play() failed:', err);
   });
 
   if (durationSec > 0) {
-    videoHideTimer = setTimeout(() => {
-      stopVideoWithFade();
-    }, durationSec * 1000);
+    videoHideTimer = setTimeout(stopVideoWithFade, durationSec * 1000);
   }
 }
 
@@ -472,6 +483,8 @@ function stopVideo() {
   containerEl.classList.remove('active', 'framed', 'unframed');
   videoEl.pause();
   videoEl.removeAttribute('src');
+  videoEl.style.display       = 'none';
+  ck.canvas.style.display     = 'none';
   ck.stop();
 }
 

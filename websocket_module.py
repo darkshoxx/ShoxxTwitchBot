@@ -62,9 +62,9 @@ _SLEEP = {
     "shiv":    10,
     "myst":    10,
     "poke":    30,
-    "where":   10,
-    "what":    10,
-    "welcome": 10,
+    "where":   5,
+    "what":    5,
+    "welcome": 5,
 }
 
 _video_queue: asyncio.Queue = None
