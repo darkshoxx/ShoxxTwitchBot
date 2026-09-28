@@ -69,29 +69,21 @@ _SLEEP = {
 
 _video_queue: asyncio.Queue = None
 _consumer_task: asyncio.Task = None
-_session: aiohttp.ClientSession = None
 _main_loop: asyncio.AbstractEventLoop = None
 
-async def _get_session() -> aiohttp.ClientSession:
-    """Returns an aiohttp session bound to the active running loop."""
-    global _session
-    current_loop = asyncio.get_running_loop()
-    if _session is None or _session.closed or getattr(_session, '_loop', None) is not current_loop:
-        _session = aiohttp.ClientSession()
-    return _session
 
 async def push_overlay_event(payload: dict):
     """POST to overlay server with stream draining to flush TCP buffers immediately."""
     print(f"[WS LOG] Pushing overlay event payload to {OVERLAY_URL}: {payload}")
     try:
-        session = await _get_session()
-        async with session.post(
-            OVERLAY_URL,
-            json=payload,
-            timeout=aiohttp.ClientTimeout(total=2),
-        ) as resp:
-            print(f"[WS LOG] POST response status code: {resp.status}")
-            await resp.read()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                OVERLAY_URL,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=2),
+            ) as resp:
+                print(f"[WS LOG] POST response status code: {resp.status}")
+                await resp.read()
     except Exception as exc:
         print(f"[WS ERROR LOG] push_overlay_event failed: {exc}")
 
