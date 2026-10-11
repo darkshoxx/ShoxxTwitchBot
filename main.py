@@ -18,6 +18,14 @@ from websocket_module import (FILTER_PARAMS, set_filter_param, start_video_queue
                               push_overlay_event, queue_pokemon)
 from unidecode import unidecode
 import aiohttp
+from demo_queue import (
+    load_queue,
+    cmd_enter, cmd_leave, cmd_current, cmd_peek, cmd_next,
+    cmd_open, cmd_close, cmd_bingo,
+    handle_potential_reply, handle_fuzzy_reply,
+    queue_is_open, OWNER,
+)
+
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 from pokemon import get_pokemon_type_list, poketypes
@@ -99,10 +107,12 @@ USER_SCOPE = [
     AuthScope.CHAT_READ,
     AuthScope.CHAT_EDIT,
     AuthScope.MODERATOR_MANAGE_BANNED_USERS,
-    AuthScope.MODERATOR_MANAGE_CHAT_MESSAGES
+    AuthScope.MODERATOR_MANAGE_CHAT_MESSAGES,
+    AuthScope.CHANNEL_MANAGE_BROADCAST
     ]
 TARGET_CHANNEL = "darkshoxx"
-
+load_queue()
+_twitch = None
 ABORT = False
 auto_spin = False
 INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
@@ -236,6 +246,62 @@ async def begin_ban_countdown(message: ChatMessage):
         await message.reply("YOUR FATE WAS SEALED! BONK BOP")
         if (message.first):
             return message.user
+
+
+async def test_message_for_queue(msg: ChatMessage, twitch):
+    """Handles all demo queue commands."""
+    text  = msg.text.strip()
+    lower = text.lower()
+    user  = msg.user.name
+    is_owner = user.lower() == OWNER.lower()
+
+    # Check for pending reply first — consumes the message if so
+    if handle_potential_reply(msg):
+        return
+
+    # Check for fuzzy category reply (owner only, any message while pending)
+    fuzzy_reply = await handle_fuzzy_reply(msg, twitch, BROADCASTER_ID)
+    if fuzzy_reply:
+        await msg.reply(fuzzy_reply)
+        return
+
+    if lower == "!enter":
+        if not queue_is_open():
+            await msg.reply("The queue is currently closed.")
+            return
+        # cmd_enter sends its own replies internally
+        result = await cmd_enter(msg, twitch)
+        if result:
+            await msg.reply(result)
+
+    elif lower == "!leave":
+        result = cmd_leave(msg)
+        await msg.reply(result)
+
+    elif lower == "!current":
+        await msg.reply(cmd_current())
+
+    elif lower == "!peek":
+        await msg.reply(cmd_peek())
+
+    elif lower == "!bingo":
+        await msg.reply(cmd_bingo())
+
+    elif lower == "!next":
+        if not is_owner:
+            return
+        result = await cmd_next(twitch, BROADCASTER_ID)
+        await msg.reply(result)
+
+    elif lower == "!open":
+        if not is_owner:
+            return
+        await msg.reply(cmd_open())
+
+    elif lower == "!close":
+        if not is_owner:
+            return
+        await msg.reply(cmd_close())
 
 async def test_message_for_violations(bot: Chat, message: ChatMessage) -> bool:
     is_bot = test_for_bot(message.text)
@@ -459,11 +525,11 @@ async def test_message_for_pokemon(msg: ChatMessage):
         print(f"[MAIN LOG] Enqueuing Pokémon event for dex #{dex}")
         await queue_pokemon(dex)
 
-async def test_message_for_submission(msg: ChatMessage):
-    words = msg.text.split(" ")
-    if words[0] in ["!add", "add", "submit", "!submit", "queue", "!queue"]:
-        print(f"[MAIN LOG] Submission trigger detected from {msg.user.name}")
-        await msg.reply("No viewerlevels!")
+# async def test_message_for_submission(msg: ChatMessage):
+#     words = msg.text.split(" ")
+#     if words[0] in ["!add", "add", "submit", "!submit", "queue", "!queue"]:
+#         print(f"[MAIN LOG] Submission trigger detected from {msg.user.name}")
+#         await msg.reply("No viewerlevels!")
 
 async def test_message_for_banned_terms(bot: Chat, msg: ChatMessage):
     words = msg.text.split(" ")
@@ -513,7 +579,7 @@ class InheritedBot(Chat):
         await test_message_for_song(msg)
         await test_message_for_music_hints(msg)
         await test_message_for_pokemon(msg)
-        await test_message_for_submission(msg)
+        await test_message_for_queue(msg, _twitch)
         await test_message_for_tom_scott(msg)
         await test_message_for_outtake(msg)
         print("is abort:" + str(is_abort))
@@ -612,7 +678,8 @@ async def run():
     await asyncio.sleep(2)
     print(f"[MAIN LOG] Initializing Twitch client with Client ID: {client_id[:5]}...")
     twitch = await Twitch(client_id, client_secret)
-
+    global _twitch
+    _twitch = twitch
     get_opera()
     if BOT_ACCOUNT == "BFTD":
         browser_name = "opera"
