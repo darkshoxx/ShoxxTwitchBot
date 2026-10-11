@@ -56,16 +56,19 @@ poke_vid_dict = {
     "answer":   "Pokemon/answer.mp4",
 }
 
-_SLEEP = {
-    "oot":     10,
-    "loom":    10,
-    "shiv":    10,
-    "myst":    10,
-    "poke":    30,
-    "where":   5,
-    "what":    5,
-    "welcome": 5,
-}
+
+POKE_QUEST_WAIT = 5 
+POKE_ANS_WAIT = 5
+# _SLEEP = {
+#     "oot":     10,
+#     "loom":    10,
+#     "shiv":    10,
+#     "myst":    10,
+#     "poke":    30,
+#     "where":   5,
+#     "what":    5,
+#     "welcome": 5,
+# }
 
 _video_queue: asyncio.Queue = None
 _consumer_task: asyncio.Task = None
@@ -131,7 +134,7 @@ async def _video_consumer():
                 # Push Question Video
                 q_src = f"/assets/videos/{poke_vid_dict['question']}"
                 print(f"[WS LOG] Pushing question video alert: {q_src}")
-                await push_overlay_event({"type": "video", "src": q_src, "duration": 10})
+                await push_overlay_event({"type": "video", "src": q_src, "duration": POKE_QUEST_WAIT})
                 
                 # 2. Wait display delay before generating answer
                 print("[WS LOG] Sleeping 12 seconds for chat guessing window...")
@@ -145,7 +148,7 @@ async def _video_consumer():
                 # Push Answer Video
                 a_src = f"/assets/videos/{poke_vid_dict['answer']}"
                 print(f"[WS LOG] Pushing answer video alert: {a_src}")
-                await push_overlay_event({"type": "video", "src": a_src, "duration": 10})
+                await push_overlay_event({"type": "video", "src": a_src, "duration": POKE_ANS_WAIT})
                 await asyncio.sleep(10)
                 
             else:
@@ -173,30 +176,30 @@ async def play_video(src: str, duration: int = 30):
     print(f"[WS LOG] play_video called with src='{src}', duration={duration}")
     _enqueue_payload({"type": "video", "src": src, "duration": duration})
 
-async def play_oot(sequence: str):
-    path = oot_song_dict.get(sequence)
-    if path:
-        await play_video(f"/assets/videos/{path}", _SLEEP["oot"])
+# async def play_oot(sequence: str):
+#     path = oot_song_dict.get(sequence)
+#     if path:
+#         await play_video(f"/assets/videos/{path}", _SLEEP["oot"])
 
-async def play_loom(sequence: str):
-    path = loom_song_dict.get(sequence)
-    if path:
-        await play_video(f"/assets/videos/{path}", _SLEEP["loom"])
+# async def play_loom(sequence: str):
+#     path = loom_song_dict.get(sequence)
+#     if path:
+#         await play_video(f"/assets/videos/{path}", _SLEEP["loom"])
 
-async def play_shiv(sequence: str):
-    path = shiv_song_dict.get(sequence)
-    if path:
-        await play_video(f"/assets/videos/{path}", _SLEEP["shiv"])
+# async def play_shiv(sequence: str):
+#     path = shiv_song_dict.get(sequence)
+#     if path:
+#         await play_video(f"/assets/videos/{path}", _SLEEP["shiv"])
 
-async def play_myst(sequence: str):
-    path = myst_song_dict.get(sequence)
-    if path:
-        await play_video(f"/assets/videos/{path}", _SLEEP["myst"])
+# async def play_myst(sequence: str):
+#     path = myst_song_dict.get(sequence)
+#     if path:
+#         await play_video(f"/assets/videos/{path}", _SLEEP["myst"])
 
-async def play_pokemon(kind: str):
-    path = poke_vid_dict.get(kind)
-    if path:
-        await play_video(f"/assets/videos/{path}", _SLEEP["poke"])
+# async def play_pokemon(kind: str):
+#     path = poke_vid_dict.get(kind)
+#     if path:
+#         await play_video(f"/assets/videos/{path}", _SLEEP["poke"])
 
 async def toggle_webcam_active():
     from obswebsocket import obsws, requests as obs_requests

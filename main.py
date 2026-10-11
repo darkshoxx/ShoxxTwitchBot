@@ -397,16 +397,16 @@ async def test_message_for_song(msg: ChatMessage):
     print(f"[MAIN LOG] Testing message for song trigger: '{clean_text}'")
     if clean_text in oot_song_dict.keys():
         print(f"[MAIN LOG] Matched OOT song: {clean_text}")
-        await play_me(oot_song_dict[clean_text], scene_dict["oot"])
+        await play_me(oot_song_dict[clean_text], scene_dict["oot"], sleep_time=10)
     elif clean_text in loom_song_dict.keys():
         print(f"[MAIN LOG] Matched Loom song: {clean_text}")
-        await play_me(loom_song_dict[clean_text], scene_dict["loom"])
+        await play_me(loom_song_dict[clean_text], scene_dict["loom"], sleep_time=7)
     elif clean_text in shiv_song_dict.keys():
         print(f"[MAIN LOG] Matched Shivers song: {clean_text}")
-        await play_me(shiv_song_dict[clean_text], scene_dict["shiv"])
+        await play_me(shiv_song_dict[clean_text], scene_dict["shiv"], sleep_time=7)
     elif clean_text in myst_song_dict.keys():
         print(f"[MAIN LOG] Matched Myst song: {clean_text}")
-        await play_me(myst_song_dict[clean_text], scene_dict["myst"])
+        await play_me(myst_song_dict[clean_text], scene_dict["myst"], sleep_time=7)
 
 GEN_POKE_DICT = {
     1: (1, 151),
@@ -484,20 +484,20 @@ async def test_message_for_tom_scott(msg: ChatMessage):
     words = msg.text.split(" ")
     if words[0].lower() == "where":
         print("WHERE MSG for tom scott")
-        await play_me(None, scene_dict["where"])
+        await play_me(None, scene_dict["where"], sleep_time=5)
     if words[0].lower() == "what":
         print("WHAT MSG for tom scott")
-        await play_me(None, scene_dict["what"])
+        await play_me(None, scene_dict["what"], sleep_time=5)
     if "welcome" in words or words[0].lower() == "welcome":
         print("WELCOME MSG for tom scott")
-        await play_me(None, scene_dict["welcome"])
+        await play_me(None, scene_dict["welcome"], sleep_time=5)
 
 async def test_message_for_outtake(msg: ChatMessage):
     words = msg.text.split(" ")
     if words[0].lower() == "outtake":
         if msg.user.name.lower() == "darkshoxx":
             print("Status: Outtake")
-            await play_me(None, scene_dict["outtake"])
+            await play_me(None, scene_dict["outtake"], sleep_time=7)
 
 class InheritedBot(Chat):
     COOLDOWN_DICT = {}

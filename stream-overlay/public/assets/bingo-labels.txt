@@ -1,47 +1,61 @@
-CRT Filter
-GPU 100%
-Rotating pixels in pixel art
-Pixel res mis-match
-Texture fidelity
-Game Crash
-OBS Crash
-Bad Resolution launch
-Z-Fighting
-Twitch TOS
-IGDB Cat + Follower
-Bad (Unity) Lighting
-Lazy repeated texture
-no input buffer
-no undo
-no reset
-Language Jumpscare
-Same Dev As X
-Game Logo GenAI
-OffByOne Error
-Dev in Chat
-Kerning
-Pun in Title
-Wall of text in 1st min
-Text not on bg lines
-Text breaching textbox
-Unreadable font
-Music is Bop
-Music gameplay Mismatch
-Crow on Stream
-Plagiarism w/o ref
-Funny Glitch
-SokoCross
-Puzzle from other game
-Issues capturing
 4th Wall break
-Obvious Vibe Views
-Librarian-Like
-Typo
-Stretched Textures
-Visual overstimulation
-Not 16:9 Res
-Intro too long
-Cat in Game
 AI SLOP
-Unique Artstyle
+Anime
+Anomaly
+Bad (Unity) Lighting
+Bad Resolution launch
+Balatro-scoring
+Cat in Game
 Conlang+Font
+Crow on Stream
+CRT Filter
+Dev in Chat
+Funny Glitch
+Game Crash
+Game Logo GenAI
+Game within game
+GPU 100%
+Hidden Object
+Human Voiceacting
+IGDB Cat + Follower
+Intro too long
+Issues capturing
+Kerning
+Language Jumpscare
+Lazy repeated texture
+Librarian-Like
+Music gameplay Mismatch
+Music is Bop
+No input buffer
+No Music
+No reset
+No tutorial
+No undo
+Not 16:9 Res
+OBS Crash
+Obvious Vibe Views
+Obvious Toggle Square
+OffByOne Error
+Phallic
+Pixel res mis-match
+Plagiarism w/o ref
+Pun in Title
+Puzzle from other game
+Rotating pixels in pixel art
+Same bingo call 3x
+Same Dev As X
+Simulated desktop
+SokoCrossSweeper
+Stretched Textures
+Teach programming
+Text breaching textbox
+Text not on bg lines
+Text too fast
+Twitch TOS
+Typo
+Unique Artstyle
+Unreadable font
+Visual fidelity mismatch
+Visual overstimulation
+Wall of text in 1st min
+Z-Fighting

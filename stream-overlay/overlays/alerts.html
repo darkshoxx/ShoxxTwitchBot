@@ -360,7 +360,7 @@ function alertPokemon(detail) {
   const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dex}.png`;
   enqueue(done => showAlert({
     type: 'pokemon', iconHtml: `<img class="poke-sprite" src="${spriteUrl}" alt="Pokémon #${padded}">`,
-    label: 'Pokémon Challenge', title: `#${padded}`, sub: 'Who\'s that Pokémon?', duration: 10000,
+    label: 'Pokémon Challenge', title: `#${padded}`, sub: 'Who\'s that Pokémon?', duration: 5000,
   }).then(done));
 }
 
