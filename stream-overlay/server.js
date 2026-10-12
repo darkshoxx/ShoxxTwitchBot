@@ -28,7 +28,7 @@ const PORT   = 3000;
 const fs = require('fs');
 
 // ── Layout state (single source of truth) ────────────────
-const layout = { notescam: false, livesplit: false };
+const layout = { notescam: false, livesplit: false, queue_open: false };
 
 // ── Bingo state ───────────────────────────────────────────
 const LABELS_FILE = path.join(__dirname, 'public', 'assets', 'bingo-labels.txt');
@@ -137,7 +137,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const overlayDir = path.join(__dirname, 'overlays');
-['webcam','background','alerts','chat','hud','notescam','livesplit','border-4x3','border-16x9','bingo-plugboard','bingo-called','bingo-board'].forEach(name => {
+['webcam','background','alerts','chat','hud','notescam','livesplit','border-4x3','border-16x9','bingo-plugboard','bingo-called','bingo-board', 'queue-overlay'].forEach(name => {
   app.get(`/${name}`, (_req, res) =>
     res.sendFile(path.join(overlayDir, `${name}.html`))
   );
@@ -190,6 +190,31 @@ app.post('/set/:source/:value', async (req, res) => {
 });
 
 app.get('/layout', (_req, res) => res.json(layout));
+
+const fs_q = require('fs');
+const QUEUE_FILE_PATH = path.join(__dirname, '..', 'current_queue.json');
+
+app.get('/queue/state', (_req, res) => {
+  try {
+    const raw     = fs_q.readFileSync(QUEUE_FILE_PATH, 'utf8');
+    const entries = JSON.parse(raw);
+    res.json(entries);
+  } catch (_) {
+    res.json([]);
+  }
+});
+
+app.post('/queue/open', (_req, res) => {
+  layout.queue_open = true;
+  broadcast({ type: 'layout', ...layout });
+  res.json({ ok: true });
+});
+
+app.post('/queue/close', (_req, res) => {
+  layout.queue_open = false;
+  broadcast({ type: 'layout', ...layout });
+  res.json({ ok: true });
+});
 
 // ── LiveSplit Server proxy ────────────────────────────────
 // Bridges the browser overlay to LiveSplit's raw TCP server.
