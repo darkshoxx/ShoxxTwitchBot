@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Queue Control – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html, body { min-height:100vh; width:100vw; background:var(--void); overflow:auto; }
+  body { padding:28px 32px; box-sizing:border-box; font-family:var(--font-body); }
+
+  h1 {
+    font-family:var(--font-display); font-size:20px; font-weight:900;
+    letter-spacing:.12em; text-transform:uppercase;
+    color:var(--cyan); text-shadow:var(--glow-cyan); margin-bottom:3px;
+  }
+  .subtitle { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); letter-spacing:.1em; margin-bottom:24px; }
+
+  /* ── Layout: left panel (controls) + right panel (full queue) ── */
+  .layout { display:grid; grid-template-columns:320px 1fr; gap:24px; align-items:start; }
+
+  /* ── Panels ── */
+  .panel {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-lg); padding:18px;
+  }
+  .panel-title {
+    font-family:var(--font-display); font-size:10px; font-weight:700;
+    letter-spacing:.2em; text-transform:uppercase; color:var(--text-muted);
+    margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid var(--border);
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family:var(--font-display); font-size:10px; font-weight:700;
+    letter-spacing:.1em; text-transform:uppercase;
+    padding:8px 16px; border-radius:var(--r-sm); border:1px solid;
+    cursor:pointer; transition:all .15s; width:100%; margin-bottom:6px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .btn:active { transform:scale(.97); }
+  .btn-next    { background:rgba(0,245,255,.08); border-color:var(--cyan); color:var(--cyan); }
+  .btn-next:hover { background:rgba(0,245,255,.18); box-shadow:var(--glow-cyan); }
+  .btn-open    { background:rgba(52,211,153,.08); border-color:#34d399; color:#34d399; }
+  .btn-open:hover { background:rgba(52,211,153,.18); }
+  .btn-close   { background:rgba(239,68,68,.08); border-color:var(--danger); color:var(--danger); }
+  .btn-close:hover { background:rgba(239,68,68,.18); }
+  .btn-reload  { background:rgba(245,158,11,.08); border-color:var(--amber); color:var(--amber); }
+  .btn-reload:hover { background:rgba(245,158,11,.18); }
+  .btn-muted   { background:rgba(255,255,255,.04); border-color:var(--border); color:var(--text-muted); }
+  .btn-muted:hover { border-color:var(--cyan); color:var(--text); }
+
+  /* ── Status box ── */
+  #status-box {
+    background:var(--elevated); border:1px solid var(--border);
+    border-radius:var(--r-sm); padding:10px 12px; margin-top:10px;
+    font-family:var(--font-mono); font-size:11px; color:var(--text-muted);
+    min-height:44px; line-height:1.5;
+  }
+  #status-box.ok  { border-color:#34d399; color:#34d399; }
+  #status-box.err { border-color:var(--danger); color:var(--danger); }
+
+  /* ── Queue state indicator ── */
+  .q-state { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+  .q-state-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .q-state-dot.open   { background:#34d399; box-shadow:0 0 6px #34d399; }
+  .q-state-dot.closed { background:var(--danger); }
+  .q-state-label { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+
+  /* ── Full queue list ── */
+  #full-queue { display:flex; flex-direction:column; gap:5px; }
+
+  .fq-entry {
+    display:flex; align-items:center; gap:10px;
+    padding:7px 12px;
+    background:var(--elevated); border-left:3px solid var(--ec,var(--border));
+    border-radius:0 var(--r-sm) var(--r-sm) 0;
+  }
+  .fq-pos {
+    flex-shrink:0; width:18px; height:18px; border-radius:50%;
+    border:1px solid var(--ec,var(--border)); display:flex; align-items:center;
+    justify-content:center; font-family:var(--font-display); font-size:9px;
+    font-weight:900; color:var(--ec,var(--text-muted)); opacity:.8;
+  }
+  .fq-body { flex:1; min-width:0; }
+  .fq-type {
+    font-family:var(--font-display); font-size:7px; font-weight:700;
+    letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ec,var(--text-muted)); opacity:.65; margin-bottom:1px;
+  }
+  .fq-label {
+    font-family:var(--font-mono); font-size:11px; color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .fq-entry:first-child .fq-label { color:var(--ec,var(--text)); font-weight:700; }
+  .fq-empty { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); padding:12px 0; }
+
+  .divider { height:1px; background:var(--border); margin:12px 0; }
+</style>
+</head>
+<body>
+<h1>Queue Control</h1>
+<div class="subtitle">Controls for darkshoxx demo queue · auto-refreshes every 3s</div>
+
+<div class="layout">
+
+  <!-- Left: controls -->
+  <div>
+    <div class="panel">
+      <div class="panel-title">Queue State</div>
+      <div class="q-state">
+        <div class="q-state-dot" id="q-dot"></div>
+        <div class="q-state-label" id="q-state-label">Loading…</div>
+      </div>
+      <button class="btn btn-open"  onclick="action('open')">▶ Open Queue</button>
+      <button class="btn btn-close" onclick="action('close')">■ Close Queue</button>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-title">Navigation</div>
+      <button class="btn btn-next"   onclick="action('next')">⏭ Next (pop top)</button>
+      <button class="btn btn-muted"  onclick="action('current')">◉ Print Current</button>
+      <button class="btn btn-muted"  onclick="action('peek')">◎ Print Next</button>
+      <div class="divider"></div>
+      <button class="btn btn-reload" onclick="action('reload')">↺ Reload labels from file</button>
+    </div>
+
+    <div id="status-box">Ready.</div>
+  </div>
+
+  <!-- Right: full queue -->
+  <div class="panel">
+    <div class="panel-title">Full Queue (<span id="q-count">0</span> entries)</div>
+    <div id="full-queue"><div class="fq-empty">Loading…</div></div>
+  </div>
+
+</div>
+
+<script>
+const COLORS = { weightless:'#00f5ff', weighted:'#c084fc', usual:'#f59e0b' };
+
+function entryColor(e) {
+  if (e.type==='usual') return COLORS.usual;
+  return e.weight ? COLORS.weighted : COLORS.weightless;
+}
+function entryTypeLabel(e) {
+  if (e.type==='usual') return 'Demo';
+  return e.weight ? 'Submission (queued)' : 'Submission';
+}
+function entryLabel(e) {
+  if (e.type==='usual') return e.game;
+  return e.game ? `${e.user} — ${e.game}` : e.user;
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function setStatus(msg, cls='') {
+  const el = document.getElementById('status-box');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+async function action(type) {
+  setStatus('Working…', '');
+  try {
+    const res = await fetch('/queue/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: type })
+    });
+    const data = await res.json();
+    setStatus(data.message || JSON.stringify(data), data.ok ? 'ok' : 'err');
+    poll();
+  } catch(e) {
+    setStatus('Error: ' + e.message, 'err');
+  }
+}
+
+async function poll() {
+  try {
+    const [qRes, lRes] = await Promise.all([fetch('/queue/state'), fetch('/layout')]);
+    const entries = await qRes.json();
+    const layout  = await lRes.json();
+    const isOpen  = layout.queue_open ?? true;
+
+    // State indicator
+    document.getElementById('q-dot').className = 'q-state-dot ' + (isOpen ? 'open' : 'closed');
+    document.getElementById('q-state-label').textContent = isOpen ? 'Queue is open' : 'Queue is closed';
+    document.getElementById('q-count').textContent = entries.length;
+
+    // Full queue list
+    const container = document.getElementById('full-queue');
+    if (!entries.length) {
+      container.innerHTML = '<div class="fq-empty">Queue is empty</div>';
+      return;
+    }
+    container.innerHTML = entries.map((e,i) => {
+      const c = entryColor(e);
+      return `<div class="fq-entry" style="--ec:${c}">
+        <div class="fq-pos">${i+1}</div>
+        <div class="fq-body">
+          <div class="fq-type">${entryTypeLabel(e)}</div>
+          <div class="fq-label">${esc(entryLabel(e))}</div>
+        </div></div>`;
+    }).join('');
+  } catch(_) {}
+}
+
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>

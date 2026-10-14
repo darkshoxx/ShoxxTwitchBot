@@ -19,11 +19,12 @@ from websocket_module import (FILTER_PARAMS, set_filter_param, start_video_queue
 from unidecode import unidecode
 import aiohttp
 from demo_queue import (
+    cmd_reload_labels,
     load_queue,
     cmd_enter, cmd_leave, cmd_current, cmd_peek, cmd_next,
     cmd_open, cmd_close, cmd_bingo,
     handle_potential_reply, handle_fuzzy_reply,
-    queue_is_open, OWNER,
+    queue_is_open, OWNER, cmd_set, get_top_game_name
 )
 
 
@@ -248,60 +249,83 @@ async def begin_ban_countdown(message: ChatMessage):
             return message.user
 
 
+async def execute_queue_action(command_name: str, chat_bot=None, custom_arg: str = None):
+    """Executes a queue action centrally, posting to Twitch chat and updating Twitch category."""
+    command_name = command_name.lower().strip()
+    result = None
+
+    if command_name == "next":
+        result = await cmd_next(_twitch, BROADCASTER_ID)
+    elif command_name == "open":
+        result = await cmd_open()
+    elif command_name == "close":
+        result = await cmd_close()
+    elif command_name == "current":
+        result = cmd_current()
+    elif command_name == "peek":
+        result = cmd_peek()
+    elif command_name == "reload":
+        result = cmd_reload_labels()
+        # Update Twitch category after reloading labels
+        cat_result = await cmd_set(_twitch, BROADCASTER_ID)
+        result += f" {cat_result}"
+    elif command_name == "set":
+        result = await cmd_set(_twitch, BROADCASTER_ID, custom_game=custom_arg)
+
+    print(f"[QUEUE ACTION LOG] Executed '{command_name}' | Result: {result}")
+
+    if result and chat_bot:
+        try:
+            print(f"[QUEUE ACTION LOG] Sending message to Twitch chat room: {TARGET_CHANNEL}")
+            await chat_bot.send_message(TARGET_CHANNEL, result)
+        except Exception as exc:
+            print(f"[QUEUE ACTION ERROR] Failed to send chat message: {exc}")
+
+    return result
+
 async def test_message_for_queue(msg: ChatMessage, twitch):
     """Handles all demo queue commands."""
     text  = msg.text.strip()
-    lower = text.lower()
+    parts = text.split(maxsplit=1)
+    lower = parts[0].lower()
+    custom_arg = parts[1] if len(parts) > 1 else None
+
     user  = msg.user.name
     is_owner = user.lower() == OWNER.lower()
 
-    # Check for pending reply first — consumes the message if so
     if handle_potential_reply(msg):
         return
 
-    # Check for fuzzy category reply (owner only, any message while pending)
     fuzzy_reply = await handle_fuzzy_reply(msg, twitch, BROADCASTER_ID)
     if fuzzy_reply:
         await msg.reply(fuzzy_reply)
         return
 
     if lower == "!enter":
-        if not queue_is_open():
+        if not await queue_is_open():
             await msg.reply("The queue is currently closed.")
             return
-        # cmd_enter sends its own replies internally
         result = await cmd_enter(msg, twitch)
         if result:
             await msg.reply(result)
 
     elif lower == "!leave":
         result = cmd_leave(msg)
-        await msg.reply(result)
-
-    elif lower == "!current":
-        await msg.reply(cmd_current())
-
-    elif lower == "!peek":
-        await msg.reply(cmd_peek())
+        # Update Twitch category if leaving altered the top of the queue
+        cat_result = await cmd_set(twitch, BROADCASTER_ID)
+        await msg.reply(f"{result} {cat_result}")
 
     elif lower == "!bingo":
         await msg.reply(cmd_bingo())
 
-    elif lower == "!next":
-        if not is_owner:
+    elif lower in ("!next", "!open", "!close", "!current", "!peek", "!reload", "!set"):
+        if lower in ("!next", "!open", "!close", "!reload", "!set") and not is_owner:
             return
-        result = await cmd_next(twitch, BROADCASTER_ID)
-        await msg.reply(result)
-
-    elif lower == "!open":
-        if not is_owner:
-            return
-        await msg.reply(cmd_open())
-
-    elif lower == "!close":
-        if not is_owner:
-            return
-        await msg.reply(cmd_close())
+        
+        action_name = lower.replace("!", "")
+        result = await execute_queue_action(action_name, chat_bot=None, custom_arg=custom_arg)
+        if result:
+            await msg.reply(result)
 
 async def test_message_for_violations(bot: Chat, message: ChatMessage) -> bool:
     is_bot = test_for_bot(message.text)
@@ -667,6 +691,30 @@ async def test_message_for_spin(bot: InheritedBot, msg: ChatMessage):
             await push_overlay_event({"type":"spin", "user": msg.user.name})
             spin = False
 
+async def listen_for_overlay_commands(chat_bot):
+    """Listens for queue actions triggered by the Web Overlay Dashboard."""
+    import aiohttp
+    import json
+
+    uri = "ws://localhost:3000"
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(uri) as ws:
+                    print("[WS LOG] Connected to overlay server WebSocket command listener.")
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = json.loads(msg.data)
+                            if data.get("type") == "queue_command":
+                                cmd = data.get("command")
+                                print(f"[WS LOG] Received dashboard command via WebSocket: {cmd}")
+                                await execute_queue_action(cmd, chat_bot=chat_bot)
+                        elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            break
+        except Exception as exc:
+            # Silence connection retries during startup
+            await asyncio.sleep(3)
+
 stop_event = None
 
 async def run():
@@ -711,6 +759,9 @@ async def run():
 
     print("[MAIN LOG] Starting Chat Client...")
     chat.start()
+
+    # Launch dashboard WebSocket command listener
+    asyncio.create_task(listen_for_overlay_commands(chat))
 
     print("[MAIN LOG] Initializing video queue in websocket module...")
     await start_video_queue()

@@ -15,6 +15,7 @@ const express = require('express');
 const http    = require('http');
 const { WebSocketServer } = require('ws');
 const path    = require('path');
+const LABELS_FILE_PATH = path.join(__dirname, 'public/assets/', 'files.txt');
 
 // obs-websocket-js v5 (npm install obs-websocket-js)
 let OBSWebSocket;
@@ -137,7 +138,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const overlayDir = path.join(__dirname, 'overlays');
-['webcam','background','alerts','chat','hud','notescam','livesplit','border-4x3','border-16x9','bingo-plugboard','bingo-called','bingo-board', 'queue-overlay'].forEach(name => {
+['webcam','background','alerts','chat','hud','notescam','livesplit','border-4x3','border-16x9','bingo-plugboard','bingo-called','bingo-board', 'queue-overlay', 'queue-control'].forEach(name => {
   app.get(`/${name}`, (_req, res) =>
     res.sendFile(path.join(overlayDir, `${name}.html`))
   );
@@ -194,9 +195,11 @@ app.get('/layout', (_req, res) => res.json(layout));
 const fs_q = require('fs');
 const QUEUE_FILE_PATH = path.join(__dirname, '..', 'current_queue.json');
 
+// ── Queue Endpoints (Delegated Controller Model) ───────────
+
 app.get('/queue/state', (_req, res) => {
   try {
-    const raw     = fs_q.readFileSync(QUEUE_FILE_PATH, 'utf8');
+    const raw     = fs.readFileSync(QUEUE_FILE_PATH, 'utf8');
     const entries = JSON.parse(raw);
     res.json(entries);
   } catch (_) {
@@ -207,13 +210,34 @@ app.get('/queue/state', (_req, res) => {
 app.post('/queue/open', (_req, res) => {
   layout.queue_open = true;
   broadcast({ type: 'layout', ...layout });
-  res.json({ ok: true });
+  res.json({ ok: true, message: 'Queue opened.' });
 });
 
 app.post('/queue/close', (_req, res) => {
   layout.queue_open = false;
   broadcast({ type: 'layout', ...layout });
-  res.json({ ok: true });
+  res.json({ ok: true, message: 'Queue closed.' });
+});
+
+// Centralized Action Endpoint for Dashboard UI
+app.post('/queue/action', async (req, res) => {
+  const { action } = req.body;
+  if (!action) return res.status(400).json({ ok: false, error: 'Missing action' });
+
+  // 1. Update server layout state if action affects open/close
+  if (action === 'open') {
+    layout.queue_open = true;
+    broadcast({ type: 'layout', ...layout });
+  } else if (action === 'close') {
+    layout.queue_open = false;
+    broadcast({ type: 'layout', ...layout });
+  }
+
+  // 2. Broadcast command event so main.py executes Twitch chat & category updates
+  broadcast({ type: 'queue_command', command: action });
+
+  // 3. Return JSON response to queue-control UI
+  res.json({ ok: true, message: `Executed command: ${action}` });
 });
 
 // ── LiveSplit Server proxy ────────────────────────────────
