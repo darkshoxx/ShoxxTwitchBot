@@ -11,6 +11,8 @@ import os
 import re
 import zoneinfo
 from typing import Optional
+import urllib.parse
+import webbrowser
 
 HERE        = os.path.abspath(os.path.dirname(__file__))
 QUEUE_FILE  = os.path.join(HERE, "current_queue.json")
@@ -269,7 +271,14 @@ async def _apply_category(twitch, broadcaster_id: str, cat) -> str:
     if twitch and broadcaster_id:
         await twitch.modify_channel_information(broadcaster_id=broadcaster_id, game_id=cat.id)
         viewer_count = await _get_category_viewers(twitch, cat.id)
-        return f"Category set to '{cat.name}'. Currently {viewer_count:,} viewers."
+        
+        # Open the Twitch category page in the default browser
+        slug = urllib.parse.quote(cat.name.lower().replace(" ", "-"), safe="")
+        category_url = f"https://www.twitch.tv/directory/category/{slug}"
+        webbrowser.open(category_url)
+
+        return f"Category set to '{cat.name}'. Currently {viewer_count:,} viewers across all live streams."
+    
     return f"Category set to '{cat.name}'."
 
 async def _apply_category_by_id(twitch, broadcaster_id: str, game_id: str):
