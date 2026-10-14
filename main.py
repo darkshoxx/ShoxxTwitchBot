@@ -697,12 +697,14 @@ async def listen_for_overlay_commands(chat_bot):
     import json
 
     uri = "ws://localhost:3000"
-    while True:
+    while stop_event is not None and not stop_event.is_set():
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(uri) as ws:
+                async with session.ws_connect(uri, timeout=aiohttp.ClientTimeout(total=2)) as ws:
                     print("[WS LOG] Connected to overlay server WebSocket command listener.")
                     async for msg in ws:
+                        if stop_event.is_set():
+                            break
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = json.loads(msg.data)
                             if data.get("type") == "queue_command":
@@ -711,9 +713,12 @@ async def listen_for_overlay_commands(chat_bot):
                                 await execute_queue_action(cmd, chat_bot=chat_bot)
                         elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                             break
-        except Exception as exc:
-            # Silence connection retries during startup
-            await asyncio.sleep(3)
+        except Exception:
+            # Sleep in small increments so shutdown is responsive
+            for _ in range(3):
+                if stop_event.is_set():
+                    break
+                await asyncio.sleep(1)
 
 stop_event = None
 
@@ -809,11 +814,17 @@ def start_bot():
     print("[MAIN LOG] Launched bot_thread.")
 
 def stop_bot():
-    global bot_thread, stop_event
+    global bot_thread, stop_event, loop
     print("[MAIN LOG] stop_bot() called.")
     if loop and loop.is_running() and stop_event is not None:
         print("[MAIN LOG] Signaling stop_event threadsafe...")
         loop.call_soon_threadsafe(stop_event.set)
+        
+        # Cancel all remaining pending asyncio tasks in loop
+        def _cancel_tasks():
+            for task in asyncio.all_tasks(loop):
+                task.cancel()
+        loop.call_soon_threadsafe(_cancel_tasks)
     
     if bot_thread and bot_thread.is_alive():
         print("[MAIN LOG] Joining bot_thread with timeout=3s...")
@@ -848,8 +859,13 @@ def script_unload():
     global node_process
     if node_process:
         print(f"[MAIN LOG] Terminating node process PID: {node_process.pid}")
-        node_process.terminate()
-        node_process.wait()
+        try:
+            # Force kill the process tree on Windows to ensure node and sub-threads die
+            import subprocess
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(node_process.pid)], capture_output=True)
+        except Exception as e:
+            print(f"[MAIN LOG ERROR] Failed to kill node process: {e}")
+        node_process = None
         print("[MAIN LOG] Node process terminated.")
 
 if __name__ == "__main__" and not IN_OBS:
