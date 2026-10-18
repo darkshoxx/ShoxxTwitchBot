@@ -19,7 +19,7 @@ QUEUE_FILE  = os.path.join(HERE, "current_queue.json")
 DONE_FILE   = os.path.join(HERE, "done.txt")
 LABELS_FILE = os.path.join(HERE, "stream-overlay", "public", "assets", "files.txt")
 
-BINGO_URL          = "https://bingobaker.com#6ab2b6440ba1d88d"
+BINGO_URL          = "https://bingobaker.com#6acd189ba5347a4a"
 GAMES_AND_DEMOS_ID = "2634"
 OWNER              = "darkshoxx"
 REPLY_TIMEOUT      = 60
@@ -273,7 +273,10 @@ async def _apply_category(twitch, broadcaster_id: str, cat) -> str:
         viewer_count = await _get_category_viewers(twitch, cat.id)
         
         # Open the Twitch category page in the default browser
-        slug = urllib.parse.quote(cat.name.lower().replace(" ", "-"), safe="")
+        slug = urllib.parse.quote(
+            cat.name.lower().replace("'", "").replace(" ", "-"),
+            safe=""
+        )
         category_url = f"https://www.twitch.tv/directory/category/{slug}"
         webbrowser.open(category_url)
 

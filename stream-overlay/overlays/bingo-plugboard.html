@@ -232,7 +232,7 @@ function escHtml(s) {
 
 // ── WebSocket sync ────────────────────────────────────────
 window.addEventListener('overlay:bingo', e => {
-  const prev = called;
+  const prev = new Set(called);  // was: const prev = called
   labels = e.detail.labels;
   called = new Set(e.detail.called);
 

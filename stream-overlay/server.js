@@ -240,6 +240,22 @@ app.post('/queue/action', async (req, res) => {
   res.json({ ok: true, message: `Executed command: ${action}` });
 });
 
+// ── Stream Deck quick-toggle for a named bingo square ─────
+const QUICK_TOGGLE_LABEL = 'Obvious Toggle Square';
+
+app.post('/bingo/quicktoggle', (_req, res) => {
+  if (!bingo.labels.includes(QUICK_TOGGLE_LABEL)) {
+    return res.status(404).json({ error: 'Label not found', label: QUICK_TOGGLE_LABEL });
+  }
+  if (bingo.called.has(QUICK_TOGGLE_LABEL)) {
+    bingo.called.delete(QUICK_TOGGLE_LABEL);
+  } else {
+    bingo.called.add(QUICK_TOGGLE_LABEL);
+  }
+  broadcast(bingoSnapshot());
+  res.json({ ok: true, label: QUICK_TOGGLE_LABEL, called: bingo.called.has(QUICK_TOGGLE_LABEL) });
+});
+
 // ── LiveSplit Server proxy ────────────────────────────────
 // Bridges the browser overlay to LiveSplit's raw TCP server.
 // Enable "LiveSplit Server" component in your LiveSplit layout.

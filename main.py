@@ -311,10 +311,13 @@ async def test_message_for_queue(msg: ChatMessage, twitch):
 
     elif lower == "!leave":
         result = cmd_leave(msg)
-        # Update Twitch category if leaving altered the top of the queue
-        cat_result = await cmd_set(twitch, BROADCASTER_ID)
-        await msg.reply(f"{result} {cat_result}")
-
+        top = get_top_game_name()
+        if top:
+            cat_result = await cmd_set(twitch, BROADCASTER_ID)
+            await msg.reply(f"{result} {cat_result}")
+        else:
+            await msg.reply(result)
+            
     elif lower == "!bingo":
         await msg.reply(cmd_bingo())
 
