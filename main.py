@@ -55,11 +55,11 @@ if STREAMING_SOFTWARE == "OBS":
                                   oot_song_dict, poke_vid_dict,
                                   shiv_song_dict, play_me, scene_dict,
                                   toggle_webcam_active)
-elif STREAMING_SOFTWARE == "SLOBS":
-    from websocket_module_SLOBS import (loom_song_dict, myst_song_dict,
-                                        oot_song_dict, play_me, poke_vid_dict,
-                                        scene_dict, shiv_song_dict,
-                                        toggle_webcam_active)
+# elif STREAMING_SOFTWARE == "SLOBS":
+#     from websocket_module_SLOBS import (loom_song_dict, myst_song_dict,
+#                                         oot_song_dict, play_me, poke_vid_dict,
+#                                         scene_dict, shiv_song_dict,
+#                                         toggle_webcam_active)
 
 BANFILE = os.path.join(HERE, "banned_terms.txt")
 ENV = os.path.join(HERE, ".env")
@@ -298,7 +298,8 @@ async def test_message_for_queue(msg: ChatMessage, twitch):
 
     fuzzy_reply = await handle_fuzzy_reply(msg, twitch, BROADCASTER_ID)
     if fuzzy_reply:
-        await msg.reply(fuzzy_reply)
+        # Fuzzy match responses are owner-only and go to console, not chat
+        await push_overlay_event({"type": "log", "message": fuzzy_reply})
         return
 
     if lower == "!enter":
@@ -314,21 +315,24 @@ async def test_message_for_queue(msg: ChatMessage, twitch):
         top = get_top_game_name()
         if top:
             cat_result = await cmd_set(twitch, BROADCASTER_ID)
-            await msg.reply(f"{result} {cat_result}")
+            # Leave confirmation goes to chat, category change goes to console
+            await msg.reply(result)
+            await push_overlay_event({"type": "log", "message": cat_result})
         else:
             await msg.reply(result)
-            
+
     elif lower == "!bingo":
         await msg.reply(cmd_bingo())
 
     elif lower in ("!next", "!open", "!close", "!current", "!peek", "!reload", "!set"):
         if lower in ("!next", "!open", "!close", "!reload", "!set") and not is_owner:
             return
-        
+
         action_name = lower.replace("!", "")
         result = await execute_queue_action(action_name, chat_bot=None, custom_arg=custom_arg)
         if result:
-            await msg.reply(result)
+            # All owner commands log to console only
+            await push_overlay_event({"type": "log", "message": result})
 
 async def test_message_for_violations(bot: Chat, message: ChatMessage) -> bool:
     is_bot = test_for_bot(message.text)
@@ -573,17 +577,25 @@ async def test_message_for_banned_terms(bot: Chat, msg: ChatMessage):
                 msg.id
                 )
 
+def tomtest(testword, wordlist):
+    return (testword in wordlist) or (wordlist[0].lower() == testword)
+
 async def test_message_for_tom_scott(msg: ChatMessage):
+    tomwords = ["tom", "scott"]
     words = msg.text.split(" ")
     if words[0].lower() == "where":
         print("WHERE MSG for tom scott")
         await play_me(None, scene_dict["where"], sleep_time=5)
-    if words[0].lower() == "what":
+    elif words[0].lower() == "what":
         print("WHAT MSG for tom scott")
         await play_me(None, scene_dict["what"], sleep_time=5)
-    if "welcome" in words or words[0].lower() == "welcome":
+    elif tomtest("welcome", words):
         print("WELCOME MSG for tom scott")
         await play_me(None, scene_dict["welcome"], sleep_time=5)
+    else:
+        for tomword in tomwords:
+            if tomtest(tomword, words):
+                await play_me(None, scene_dict["tomscott"], sleep_time=5)
 
 async def test_message_for_outtake(msg: ChatMessage):
     words = msg.text.split(" ")

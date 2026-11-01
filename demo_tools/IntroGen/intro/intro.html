@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Intro – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
+<style>
+  html, body { background: var(--void); }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #sheet { display: none; background: #000; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "/vendor/three/build/three.module.js",
+    "three/addons/": "/vendor/three/examples/jsm/"
+} }
+</script>
+</head>
+<body class="scanlines">
+<canvas id="gl"></canvas>
+<canvas id="sheet"></canvas>
+
+<script type="module">
+/*
+  2-second logo intro: 3D metallic hexagon + name, over the stream's hex-grid background.
+
+  Preview in a browser (run `node intro/render.mjs --serve`, then open the printed URL):
+    /intro               plays in a loop
+    /intro?t=1.2         frozen at t = 1.2 s
+    /intro?sheet=1       contact sheet of 9 frames across the whole animation
+  Everything is driven by renderAt(t), so exports are frame-exact (see render.mjs).
+*/
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ═══════════════════════════════════════════════════════════════════════
+// SYNTHETIC SOUND EFFECT (Web Audio API)
+// ═══════════════════════════════════════════════════════════════════════
+let audioCtx = null;
+function playIntroSound() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const now = audioCtx.currentTime;
+
+  // 1. Synthetic ZOOM (Frequency sweep + Filter sweep)
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(80, now);
+  osc.frequency.exponentialRampToValueAtTime(600, now + 0.6);
+
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(200, now);
+  filter.frequency.exponentialRampToValueAtTime(2500, now + 0.55);
+
+  gain.gain.setValueAtTime(0.01, now);
+  gain.gain.linearRampToValueAtTime(0.25, now + 0.4);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start(now);
+  osc.stop(now + 0.7);
+
+  // 2. Final "PLING" (Bell-like high sine wave with long decay)
+  const plingTime = now + 0.58; 
+  const plingOsc = audioCtx.createOscillator();
+  const plingGain = audioCtx.createGain();
+
+  plingOsc.type = 'sine';
+  plingOsc.frequency.setValueAtTime(1046.50, plingTime); // High C (C6)
+  plingOsc.frequency.exponentialRampToValueAtTime(2093.00, plingTime + 0.05);
+
+  plingGain.gain.setValueAtTime(0.01, plingTime);
+  plingGain.gain.linearRampToValueAtTime(0.3, plingTime + 0.02);
+  plingGain.gain.exponentialRampToValueAtTime(0.0001, plingTime + 1.2);
+
+  plingOsc.connect(plingGain);
+  plingGain.connect(audioCtx.destination);
+
+  plingOsc.start(plingTime);
+  plingOsc.stop(plingTime + 1.3);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CONFIG — tweak freely
+// ═══════════════════════════════════════════════════════════════════════
+const CFG = {
+  duration: 2.0,            // seconds
+  name: 'DARKSHOXX',
+  scanlines: true,          // the .scanlines overlay from tokens.css
+
+  // palette (tokens.css)
+  void: '#0d0f14', purple: '#7c3aed', cyan: '#00f5ff', border: '#2a3050',
+
+  camera: { fov: 30, distance: 8 },
+  logoY: 0.42,              // vertical position of the hexagon (world units, + is up)
+
+  timeline: {
+    popFrom: 0.4, popDuration: 0.55,       // scale-in
+    spinTurns: 1, spinDuration: 1.45,      // full turns, decelerating to face-on
+    tilt: 0.35,                            // initial pitch (radians), settles to 0
+    textStart: 0.75, textStagger: 0.05, textFade: 0.4,
+    flashAt: 1.15, flashGain: 0.2,         // bloom pulse when the spin settles
+  },
+
+  rings: { outerSpeed: 70, innerSpeed: -110 },   // degrees per second (in-plane spin)
+
+  metal: { color: '#c3cbe3', roughness: 0.26, clearcoat: 0.7 },
+  gem:   { color: '#9b6bff', roughness: 0.18 },
+  env:   { intensity: 1.0, sweep: 0.9 },         // sweep: how fast reflections slide
+  glow: 2.4,                                     // HDR multiplier on emissive parts
+  bloom: { strength: 0.4, radius: 0.55, threshold: 0.9 },
+
+  text: { fontPx: 190, spacing: 18, y: -1.55, width: 4.2, glow: 0.8 },
+
+  background: { hexSize: 38, gap: 2, scrollX: 0.18, scrollY: 0.10, pulseSpeed: 0.008,
+    colorA: [124, 58, 237], colorB: [0, 245, 255], colorDim: [30, 40, 70] },
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// helpers
+// ═══════════════════════════════════════════════════════════════════════
+const TAU = Math.PI * 2;
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
+const easeOutExpo = x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+const easeOutBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+
+const params = new URLSearchParams(location.search);
+const CAPTURE = params.has('capture');
+const SHEET = params.has('sheet');
+const FIXED_T = params.has('t') ? parseFloat(params.get('t')) : null;
+
+window.__duration = CFG.duration;
+
+async function loadFont() {
+  try {
+    await Promise.race([
+      document.fonts.load('900 64px Orbitron', CFG.name),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+    ]);
+  } catch (e) { /* handled below */ }
+  window.__fontOk = [...document.fonts].some(f => f.family.replace(/["']/g, '') === 'Orbitron' && f.status === 'loaded');
+  if (!window.__fontOk) console.warn('Orbitron did not load (offline?). Falling back to a system font.');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// background (2D canvas used as the scene background)
+// ═══════════════════════════════════════════════════════════════════════
+function drawBackground(ctx, W, H, t) {
+  const B = CFG.background;
+  const hexW = Math.sqrt(3) * B.hexSize, hexH = 2 * B.hexSize;
+  const hW = hexW + B.gap, hH = hexH * 0.75 + B.gap;
+  const cols = Math.ceil(W / hW) + 3, rows = Math.ceil(H / hH) + 3;
+  const tick = t * 60;
+  const offsetX = (B.scrollX * tick) % (2 * hW);
+  const offsetY = (B.scrollY * tick) % hH;
+  const rot = Math.PI / 180 * (0 - 30);
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = CFG.void;
+  ctx.fillRect(0, 0, W, H);
+
+  const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  for (let row = -2; row < rows; row++) {
+    for (let col = -2; col < cols; col++) {
+      const stagger = col % 2 === 0 ? 0 : hH / 2;
+      const cx = col * hW - offsetX;
+      const cy = row * hH + stagger - offsetY;
+
+      const dx = cx - W / 2, dy = cy - H / 2;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const wave = Math.sin(dist * 0.012 - tick * B.pulseSpeed) * 0.5 + 0.5;
+      const brightness = Math.pow(wave, 2.5);
+      const [r, g, b] = mix(B.colorDim, mix(B.colorA, B.colorB, wave), brightness * 0.85);
+      const alpha = 0.3 + brightness * 0.55;
+
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = rot + (Math.PI / 3) * i;
+        const x = cx + B.hexSize * Math.cos(a), y = cy + B.hexSize * Math.sin(a);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.fill();
+      if (brightness > 0.7) {
+        ctx.strokeStyle = `rgba(${r},${g},${b},${(brightness - 0.7) * 1.5})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(0.9 * W, 0.8 * H);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+  g.addColorStop(0.4, 'rgba(13,15,20,0)');
+  g.addColorStop(1, 'rgba(13,15,20,0.85)');
+  ctx.fillStyle = g;
+  ctx.fillRect(-1, -1, 2, 2);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// geometry helpers
+// ═══════════════════════════════════════════════════════════════════════
+function hexPoints(R) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 2 + i * Math.PI / 3;
+    pts.push(new THREE.Vector2(R * Math.cos(a), R * Math.sin(a)));
+  }
+  return pts;
+}
+
+function extrudeHex(outerR, innerR, depth, bevel) {
+  const shape = new THREE.Shape(hexPoints(outerR));
+  if (innerR > 0) shape.holes.push(new THREE.Path(hexPoints(innerR)));
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth, steps: 1, curveSegments: 1,
+    bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3,
+  });
+  geo.translate(0, 0, -depth / 2);
+  return geo;
+}
+
+function gradientColors(geo, R, glow) {
+  const purple = new THREE.Color(CFG.purple), cyan = new THREE.Color(CFG.cyan), c = new THREE.Color();
+  const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = clamp01((pos.getX(i) - pos.getY(i)) / (2 * R) + 0.5);
+    c.copy(purple).lerp(cyan, 1 - Math.abs(2 * t - 1)).multiplyScalar(glow);
+    colors.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+function makeInlay(outerR, innerR, z) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+  for (const side of [1, -1]) {
+    const geo = extrudeHex(outerR, innerR, 0.006, 0);
+    geo.translate(0, 0, side * z);
+    gradientColors(geo, (outerR + innerR) / 2, CFG.glow);
+    group.add(new THREE.Mesh(geo, mat));
+  }
+  return group;
+}
+
+function dashedHexRing(R, perEdge, dashRatio, thickness, hex, glow) {
+  const verts = hexPoints(R);
+  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(glow), toneMapped: false });
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, perEdge * 6);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+  const zAxis = new THREE.Vector3(0, 0, 1);
+  let n = 0;
+  for (let e = 0; e < 6; e++) {
+    const a = verts[e], b = verts[(e + 1) % 6];
+    const dir = new THREE.Vector2().subVectors(b, a);
+    const L = dir.length(), pitch = L / perEdge;
+    q.setFromAxisAngle(zAxis, Math.atan2(dir.y, dir.x));
+    for (let i = 0; i < perEdge; i++) {
+      const u = ((i + 0.5) * pitch) / L;
+      p.set(a.x + dir.x * u, a.y + dir.y * u, 0);
+      s.set(pitch * dashRatio, thickness, thickness);
+      m.compose(p, q, s);
+      mesh.setMatrixAt(n++, m);
+    }
+  }
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+function buildEnvScene() {
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(
+    new THREE.BoxGeometry(24, 24, 24),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(CFG.border).multiplyScalar(0.9), side: THREE.BackSide })));
+  const panel = (w, h, hex, intensity, pos) => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(intensity), side: THREE.DoubleSide }));
+    m.position.set(...pos);
+    m.lookAt(0, 0, 0);
+    env.add(m);
+  };
+  panel(14, 3, '#ffffff', 5, [0, 9, 2]);          // top softbox
+  panel(2.2, 16, CFG.purple, 16, [-9, 0, 1]);     // left strip
+  panel(2.2, 16, CFG.cyan, 16, [9, 0, 1]);        // right strip
+  panel(6, 2.2, CFG.cyan, 10, [3.5, 3.5, 10]);    // behind camera, upper right
+  panel(6, 2.2, CFG.purple, 12, [-3.5, -3, 10]);  // behind camera, lower left
+  panel(10, 2, '#ffffff', 2.5, [0, -9, 0]);       // floor bounce
+  return env;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// main
+// ═══════════════════════════════════════════════════════════════════════
+async function main() {
+  await loadFont();
+
+  const glCanvas = document.getElementById('gl');
+  const W = window.innerWidth, H = window.innerHeight;
+  if (!CFG.scanlines) document.body.classList.remove('scanlines');
+
+  const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(W, H, false);
+  renderer.toneMapping = THREE.NoToneMapping;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(CFG.camera.fov, W / H, 0.1, 100);
+  camera.position.set(0, 0, CFG.camera.distance);
+
+  // background
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = W; bgCanvas.height = H;
+  const bgCtx = bgCanvas.getContext('2d');
+  const bgTex = new THREE.CanvasTexture(bgCanvas);
+  bgTex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = bgTex;
+
+  // reflections
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(buildEnvScene(), 0.03).texture;
+  scene.environmentIntensity = CFG.env.intensity;
+
+  // ── logo ──
+  const logo = new THREE.Group();
+  logo.position.y = CFG.logoY;
+  scene.add(logo);
+
+  const metal = new THREE.MeshPhysicalMaterial({
+    color: CFG.metal.color, metalness: 1, roughness: CFG.metal.roughness,
+    clearcoat: CFG.metal.clearcoat, clearcoatRoughness: 0.1 });
+  const gemMat = new THREE.MeshPhysicalMaterial({
+    color: CFG.gem.color, metalness: 1, roughness: CFG.gem.roughness, clearcoat: 1, clearcoatRoughness: 0.05 });
+
+  logo.add(new THREE.Mesh(extrudeHex(0.98, 0.80, 0.12, 0.035), metal));   // frame
+  logo.add(makeInlay(0.925, 0.895, 0.097));                                // frame glow line
+  logo.add(new THREE.Mesh(extrudeHex(0.42, 0, 0.14, 0.05), gemMat));       // centre gem
+  logo.add(makeInlay(0.30, 0.272, 0.122));                                 // gem glow line
+
+  const nodeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(CFG.cyan).multiplyScalar(CFG.glow * 1.4), toneMapped: false });
+  const nodes = hexPoints(0.91).map(p => {
+    const n = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 12), nodeMat);
+    n.position.set(p.x, p.y, 0.1);
+    logo.add(n);
+    return n;
+  });
+
+  const ringOuter = new THREE.Group(), ringInner = new THREE.Group();
+  ringOuter.add(dashedHexRing(1.17, 6, 0.375, 0.014, CFG.purple, CFG.glow));
+  ringInner.add(dashedHexRing(0.64, 9, 0.18, 0.012, CFG.cyan, CFG.glow));
+  logo.add(ringOuter, ringInner);
+
+  // ── name ──
+  const TEXT_W = 2048, TEXT_H = 384;
+  const textCanvas = document.createElement('canvas');
+  textCanvas.width = TEXT_W; textCanvas.height = TEXT_H;
+  const tctx = textCanvas.getContext('2d');
+  const textTex = new THREE.CanvasTexture(textCanvas);
+  textTex.colorSpace = THREE.SRGBColorSpace;
+  textTex.anisotropy = 8;
+  const textMat = new THREE.MeshBasicMaterial({ map: textTex, transparent: true, depthWrite: false, toneMapped: false });
+  textMat.color.setScalar(CFG.text.glow);
+  const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(CFG.text.width, CFG.text.width * TEXT_H / TEXT_W), textMat);
+  textMesh.position.set(0, CFG.text.y, 0);
+  scene.add(textMesh);
+
+  function drawText(t) {
+    const tl = CFG.timeline, T = CFG.text;
+    tctx.clearRect(0, 0, TEXT_W, TEXT_H);
+    tctx.font = `900 ${T.fontPx}px Orbitron, 'Segoe UI', sans-serif`;
+    tctx.textBaseline = 'alphabetic';
+
+    const chars = [...CFG.name];
+    const widths = chars.map(c => tctx.measureText(c).width);
+    const space = lerp(T.spacing * 3, T.spacing, easeOutExpo(clamp01((t - tl.textStart) / (tl.textFade * 2))));
+    const total = widths.reduce((a, b) => a + b, 0) + space * (chars.length - 1);
+    const k = Math.min(1, (TEXT_W * 0.94) / total);
+
+    tctx.save();
+    tctx.translate(TEXT_W / 2, TEXT_H * 0.62);
+    tctx.scale(k, k);
+
+    let x = -total / 2;
+    chars.forEach((c, i) => {
+      const p = clamp01((t - tl.textStart - i * tl.textStagger) / tl.textFade);
+      if (p > 0) {
+        const e = easeOutCubic(p);
+        tctx.globalAlpha = e;
+        const dy = (1 - e) * 28;
+        tctx.fillStyle = '#ffffff';
+        tctx.shadowColor = 'rgba(0,245,255,0.4)';
+        tctx.shadowBlur = 8;
+        tctx.fillText(c, x, dy);
+        tctx.shadowBlur = 2;
+        tctx.fillText(c, x, dy);
+      }
+      x += widths[i] + space;
+    });
+
+    const p2 = easeOutExpo(clamp01((t - tl.textStart - 0.1) / 0.5));
+    if (p2 > 0) {
+      const w = total * 0.92 * p2;
+      const grad = tctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+      grad.addColorStop(0, CFG.purple); grad.addColorStop(0.5, CFG.cyan); grad.addColorStop(1, CFG.purple);
+      tctx.globalAlpha = 1;
+      tctx.fillStyle = grad;
+      tctx.shadowColor = 'rgba(0,245,255,0.8)';
+      tctx.shadowBlur = 14;
+      tctx.fillRect(-w / 2, 44, w, 5);
+    }
+    tctx.restore();
+    textTex.needsUpdate = true;
+  }
+
+  // ── post: bloom ──
+  const target = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: 4 });
+  const composer = new EffectComposer(renderer, target);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), CFG.bloom.strength, CFG.bloom.radius, CFG.bloom.threshold);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+
+  // ── the whole animation as a pure function of time ──
+  let lastT = -1;
+  function renderAt(t) {
+    t = Math.max(0, t);
+    const tl = CFG.timeline;
+
+    if (t > tl.flashAt && lastT <= tl.flashAt) {
+      playIntroSound();
+    }
+    lastT = t;
+
+    drawBackground(bgCtx, bgCanvas.width, bgCanvas.height, t);
+    bgTex.needsUpdate = true;
+    drawText(t);
+
+    logo.scale.setScalar(lerp(tl.popFrom, 1, easeOutBack(clamp01(t / tl.popDuration))));
+    const spin = easeOutCubic(clamp01(t / tl.spinDuration));
+    logo.rotation.y = TAU * tl.spinTurns * (1 - spin) + Math.sin(t * 2.4) * 0.06 * spin;
+    logo.rotation.x = tl.tilt * (1 - spin) + Math.cos(t * 1.9) * 0.035 * spin;
+
+    ringOuter.rotation.z = THREE.MathUtils.degToRad(CFG.rings.outerSpeed) * t;
+    ringInner.rotation.z = THREE.MathUtils.degToRad(CFG.rings.innerSpeed) * t;
+    nodes.forEach((n, i) => n.scale.setScalar(1 + 0.35 * Math.sin(t * 9 + i * 1.05)));
+
+    scene.environmentRotation.y = t * CFG.env.sweep;
+
+    const flash = Math.exp(-Math.pow((t - tl.flashAt) / 0.15, 2));
+    bloom.strength = CFG.bloom.strength * (1 + tl.flashGain * flash);
+
+    composer.render();
+  }
+  window.renderAt = renderAt;
+
+  // ── modes ──
+  async function drawSheet() {
+    const N = 9, cols = 3;
+    const sheet = document.getElementById('sheet');
+    sheet.width = 1920; sheet.height = 1080;
+    const ctx = sheet.getContext('2d');
+    const cw = sheet.width / cols, ch = cw * H / W;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, sheet.width, sheet.height);
+    ctx.font = '22px monospace'; ctx.lineWidth = 4;
+    for (let i = 0; i < N; i++) {
+      const t = (i / (N - 1)) * CFG.duration;
+      renderAt(t);
+      const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
+      ctx.drawImage(glCanvas, x, y, cw, ch);
+      ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+      ctx.strokeText(`t=${t.toFixed(2)}s`, x + 10, y + 28);
+      ctx.fillText(`t=${t.toFixed(2)}s`, x + 10, y + 28);
+    }
+    glCanvas.style.display = 'none';
+    sheet.style.display = 'block';
+    document.body.classList.remove('scanlines');
+  }
+
+  if (SHEET) {
+    await drawSheet();
+  } else if (CAPTURE) {
+    renderAt(0);
+  } else if (FIXED_T !== null) {
+    renderAt(FIXED_T);
+  } else {
+    const hold = 0.8, start = performance.now();
+    const loop = now => {
+      renderAt(Math.min(((now - start) / 1000) % (CFG.duration + hold), CFG.duration));
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  window.__ready = true;
+}
+
+main().catch(err => {
+  console.error(err);
+  window.__error = String((err && err.stack) || err);
+  document.body.insertAdjacentHTML('beforeend',
+    `<pre style="position:fixed;top:8px;left:8px;right:8px;z-index:1000;color:#ef4444;font:14px monospace;white-space:pre-wrap">${window.__error.replace(/</g, '&lt;')}</pre>`);
+});
+</script>
+</body>
+</html>

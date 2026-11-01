@@ -21,6 +21,7 @@ scene_dict = {
     "where": "7 131",
     "what": "7 132",
     "welcome": "7 133",
+    "tomscott": "7 777"
 }
 
 oot_song_dict = {
@@ -233,11 +234,12 @@ def _list_folder(rel):
 
 async def play_me(index, scene_index: str, sleep_time=30):
     BASE = "/assets/videos/"
-    if scene_index in ("7 131", "7 132", "7 133", "7 1 9"):
+    if scene_index in ("7 131", "7 132", "7 133", "7 1 9", "7 777"):
         ts_pools = {
             "7 131": lambda: _list_folder("TomScott/Where"),
             "7 132": lambda: _list_folder("TomScott/What"),
             "7 133": lambda: _list_folder("TomScott/Welcome"),
+            "7 777": lambda: _list_folder("TomScott"),
             "7 1 9":  lambda: _list_folder("Outtakes"),
         }
         pool = ts_pools[scene_index]()

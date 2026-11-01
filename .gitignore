@@ -5,6 +5,7 @@ output/
 pokelog.txt
 .pyslobs
 stream-overlay/public/assets/videos/
+demo_tools/token.json
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

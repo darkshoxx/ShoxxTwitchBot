@@ -19,7 +19,7 @@ QUEUE_FILE  = os.path.join(HERE, "current_queue.json")
 DONE_FILE   = os.path.join(HERE, "done.txt")
 LABELS_FILE = os.path.join(HERE, "stream-overlay", "public", "assets", "files.txt")
 
-BINGO_URL          = "https://bingobaker.com#6acd189ba5347a4a"
+BINGO_URL          = "https://bingobaker.com#6ab178cff57bd77c"
 GAMES_AND_DEMOS_ID = "2634"
 OWNER              = "darkshoxx"
 REPLY_TIMEOUT      = 60
@@ -267,21 +267,32 @@ async def _get_category_viewers(twitch, game_id: str) -> int:
             break
     return total
 
+async def _log(message: str):
+    """Push a log-only event to the server console (does not broadcast to overlays)."""
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            await session.post(
+                f"{SERVER}/event",
+                json={"type": "log", "message": message},
+                timeout=aiohttp.ClientTimeout(total=1),
+            )
+    except Exception:
+        pass
+
 async def _apply_category(twitch, broadcaster_id: str, cat) -> str:
     if twitch and broadcaster_id:
         await twitch.modify_channel_information(broadcaster_id=broadcaster_id, game_id=cat.id)
         viewer_count = await _get_category_viewers(twitch, cat.id)
-        
-        # Open the Twitch category page in the default browser
-        slug = urllib.parse.quote(
-            cat.name.lower().replace("'", "").replace(" ", "-"),
-            safe=""
-        )
-        category_url = f"https://www.twitch.tv/directory/category/{slug}"
-        webbrowser.open(category_url)
 
-        return f"Category set to '{cat.name}'. Currently {viewer_count:,} viewers across all live streams."
-    
+        # Use Twitch search URL — works for any game name regardless of special characters
+        search_url = f"https://www.twitch.tv/search?term={urllib.parse.quote(cat.name)}&type=games"
+        webbrowser.open(search_url)
+
+        msg = f"Category set to '{cat.name}'. Currently {viewer_count:,} viewers across all live streams."
+        await _log(msg)
+        return msg
+
     return f"Category set to '{cat.name}'."
 
 async def _apply_category_by_id(twitch, broadcaster_id: str, game_id: str):

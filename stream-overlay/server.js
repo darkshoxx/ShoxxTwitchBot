@@ -161,6 +161,10 @@ wss.on('connection', ws => {
 app.post('/event', (req, res) => {
   const event = req.body;
   if (!event?.type) return res.status(400).json({ error: 'Missing type' });
+  if (event.type === 'log') {
+    console.log(`[BOT] ${event.message}`);
+    return res.json({ ok: true });
+  }
   broadcast(event);
   res.json({ ok: true });
 });
@@ -363,8 +367,51 @@ app.get('/test/:type', (req, res) => {
 // ── Start ─────────────────────────────────────────────────
 server.listen(PORT, async () => {
   await connectOBS();
-  console.log(`\n🎮 Stream Overlay Server  http://localhost:${PORT}/`);
-  console.log(`   Overlays: /webcam /background /alerts /chat /hud /notescam /livesplit`);
-  console.log(`   Toggle:   POST /toggle/notescam   POST /toggle/livesplit`);
-  console.log(`   Force:    POST /set/notescam/true  POST /set/livesplit/false\n`);
+
+  const line = (label, value) => console.log(`   ${label.padEnd(22)} ${value}`);
+  const divider = () => console.log(`   ${'─'.repeat(60)}`);
+
+  console.log(`\n🎮  darkshoxx Stream Overlay Server`);
+  console.log(`    http://localhost:${PORT}/\n`);
+
+  console.log(`   ── Overlay Browser Sources ─────────────────────────────`);
+  line('Hub (control panel)', `http://localhost:${PORT}/`);
+  line('Background',          `http://localhost:${PORT}/background        1920×1080`);
+  line('Webcam frame',        `http://localhost:${PORT}/webcam            400×400`);
+  line('Alerts + video',      `http://localhost:${PORT}/alerts            1920×1080`);
+  line('Chat',                `http://localhost:${PORT}/chat              340×600`);
+  line('HUD',                 `http://localhost:${PORT}/hud               1920×1080`);
+  line('Notescam frame',      `http://localhost:${PORT}/notescam          1920×1080`);
+  line('LiveSplit frame',     `http://localhost:${PORT}/livesplit         1920×1080`);
+  line('Bingo board',         `http://localhost:${PORT}/bingo-board       400×420`);
+  line('Bingo called list',   `http://localhost:${PORT}/bingo-called      560×400`);
+  line('Queue (OBS strip)',    `http://localhost:${PORT}/queue-overlay     400×175`);
+  divider();
+
+  console.log(`   ── Control Panels (browser tabs, not OBS) ──────────────`);
+  line('Bingo plugboard',     `http://localhost:${PORT}/bingo-plugboard`);
+  line('Queue control',       `http://localhost:${PORT}/queue-control`);
+  divider();
+
+  console.log(`   ── Stream Deck endpoints ───────────────────────────────`);
+  line('Toggle notescam',     `POST /toggle/notescam`);
+  line('Toggle livesplit',    `POST /toggle/livesplit`);
+  line('Toggle bingo square', `POST /bingo/quicktoggle`);
+  line('Open queue',          `POST /queue/open`);
+  line('Close queue',         `POST /queue/close`);
+  divider();
+
+  console.log(`   ── Bot endpoints ────────────────────────────────────────`);
+  line('Push event',          `POST /event`);
+  line('Queue action',        `POST /queue/action  { action: next|open|close|... }`);
+  line('Layout force-set',    `POST /set/notescam/true|false`);
+  divider();
+
+  console.log(`   ── Dev / test ───────────────────────────────────────────`);
+  line('Fire test event',     `GET  /test/follow|sub|resub|pokemon|spin|raid|ban`);
+  line('Layout test',         `GET  /test/layout_notescam|layout_livesplit|layout_both|layout_none`);
+  line('Queue state',         `GET  /queue/state`);
+  line('Bingo state',         `GET  /bingo/state`);
+  line('Layout state',        `GET  /layout`);
+  console.log('');
 });
