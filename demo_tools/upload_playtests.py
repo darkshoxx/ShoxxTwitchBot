@@ -2,7 +2,7 @@
 """Upload cut playtest videos to YouTube.
 
 Uploads every CSV row where Processed is True and Uploaded is not True, using the
-file "<Game Name> - <Studio>.mp4" in the output folder configured in cut_playtests.py.
+file "<Game Name> - <Studio>.mp4" in the output folder configured in playtest_editor.py.
 Uploaded is set to True right after YouTube has accepted the video.
 
 Setup (once):
@@ -10,13 +10,16 @@ Setup (once):
     Put the OAuth client ID and secret (type "Desktop app") in a .env file, see ENV_PATH below.
 
 Usage:
-    python upload_playtests.py --dry-run            # show titles/descriptions, upload nothing
+    python upload_playtests.py --dry-run            # show titles/descriptions/thumbnails, upload nothing
     python upload_playtests.py --export-metadata    # write "<video>.txt" files for manual upload
     python upload_playtests.py --limit 1            # upload only one video (good first test)
     python upload_playtests.py                      # upload everything pending
 
 IMPORTANT: until your Google Cloud project has passed YouTube's API audit, every video
 uploaded through the API is locked to private and cannot be made public afterwards.
+
+The YouTube API cannot set the specific "Game title" of a video. The script sets the
+Gaming category and prints a checklist of Studio links at the end for that manual step.
 """
 
 import argparse
@@ -32,7 +35,7 @@ from pathlib import Path
 import httplib2
 
 from playtest_editor import (CSV_PATH, FFMPEG, OUT_DIR, is_true, load_csv,
-                           output_filename, save_csv)
+                             output_filename, save_csv)
 
 try:
     from dotenv import load_dotenv
@@ -71,16 +74,17 @@ NOTIFY_SUBSCRIBERS = False       # only relevant once a video is public
 
 # --- Title / description / tags ------------------------------------------------ #
 # Placeholders available in all templates:
+#   {index}  the CSV "Index" column (1, 2, 3, ...): one number per playtest
 #   {game}   Game Name from the CSV, unmodified (colons etc. kept)
 #   {studio} Studio from the CSV
 #   {date}   playtest date formatted with DATE_FORMAT
 #   {raw_date} playtest date exactly as in the CSV (dd-mm-yy)
-#   {video_index} VOD number
+#   {video_index} VOD number (several playtests can share one VOD)
 # Literal curly braces in a template must be doubled: {{ and }}.
 # For anything fancier (conditions, per-game text), edit build_metadata() below.
 DATE_FORMAT = "%d %B %Y"         # "05 September 2026"
 
-TITLE_TEMPLATE = "{video_index} | {game} | Playtest | {studio}"   # YouTube limit: 100 characters
+TITLE_TEMPLATE = "{index} | {game} | Playtest | {studio}"   # YouTube limit: 100 characters
 
 DESCRIPTION_TEMPLATE = """Playtest of "{game}" by {studio}, recorded live on {date}.
 
@@ -104,17 +108,18 @@ TAG_TEMPLATES = ["{game}", "{studio}", "playtest", "gameplay", "indie game", "pl
 
 # --- Thumbnails ------------------------------------------------------------------ #
 # Order of preference:
-#   1. A file in CUSTOM_THUMBNAILS_DIR named like the video, e.g. "Slag Run - Shiny Object Games.png"
-#      (.png / .jpg / .jpeg). Set the directory to None to disable.
+#   1. A file in CUSTOM_THUMBNAILS_DIR named after the CSV Index, e.g. "1.jpg" for Index 1
+#      (.jpg / .jpeg / .png). Set the directory to None to disable.
 #   2. A frame grabbed from the video with ffmpeg (if FRAME_THUMBNAIL is True).
 #   3. Nothing: YouTube picks one of its auto-generated frames.
 # Custom thumbnails need a channel with phone verification, max 2 MB, 16:9 recommended (1280x720).
-CUSTOM_THUMBNAILS_DIR = None     # e.g. Path(r"D:\DANVID\darkshoxx\Demos + Puzzles\Thumbnails")
+CUSTOM_THUMBNAILS_DIR = Path(r"D:\DANVID\darkshoxx\Demos + Puzzles\Thumbnails")     # e.g. Path(r"D:\DANVID\darkshoxx\Demos + Puzzles\Thumbnails")
 FRAME_THUMBNAIL = True
 FRAME_THUMBNAIL_AT_SECONDS = 60  # where in the video to grab the frame (falls back to 0s if too short)
 
 # --- Optional: add every upload to a playlist ------------------------------------ #
-# Needs a broader permission (the script asks for it on first login). None = disabled.
+# Needs a broader permission than plain uploading. If you set or change this after having
+# logged in once, the script notices and asks you to log in again. None = disabled.
 PLAYLIST_ID = "PLb3f9SzNBosg"               # e.g. "PLxxxxxxxxxxxxxxxx"
 
 
@@ -127,6 +132,7 @@ def build_metadata(row: dict) -> dict:
         date = raw_date
 
     fields = {
+        "index": row["Index"].strip(),
         "game": row["Game Name"].strip(),
         "studio": row["Studio"].strip(),
         "date": date,
@@ -144,9 +150,11 @@ def build_metadata(row: dict) -> dict:
 # End of customization
 # =========================================================================== #
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+FULL_SCOPE = "https://www.googleapis.com/auth/youtube"
+SCOPES = [UPLOAD_SCOPE]
 if PLAYLIST_ID:
-    SCOPES.append("https://www.googleapis.com/auth/youtube")
+    SCOPES.append(FULL_SCOPE)
 
 CHUNK_SIZE = 8 * 1024 * 1024  # must be a multiple of 256 KB
 MAX_RETRIES = 6
@@ -179,14 +187,24 @@ def finalize_metadata(meta: dict) -> dict:
     return {"title": title, "description": description, "tags": tags}
 
 
-def find_custom_thumbnail(video_path: Path) -> Path | None:
+def find_custom_thumbnail(index: str) -> Path | None:
+    """<CUSTOM_THUMBNAILS_DIR>/<Index>.jpg (or .jpeg / .png)."""
     if CUSTOM_THUMBNAILS_DIR is None:
         return None
-    for ext in (".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"):
-        candidate = CUSTOM_THUMBNAILS_DIR / (video_path.stem + ext)
+    for ext in (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"):
+        candidate = CUSTOM_THUMBNAILS_DIR / f"{index}{ext}"
         if candidate.exists():
             return candidate
     return None
+
+
+def describe_thumbnail(index: str) -> str:
+    custom = find_custom_thumbnail(index)
+    if custom:
+        return f"custom file {custom.name}"
+    if FRAME_THUMBNAIL:
+        return f"frame grab at {FRAME_THUMBNAIL_AT_SECONDS}s (no {index}.jpg found)"
+    return "none (YouTube will pick one)"
 
 
 def grab_frame(video_path: Path, out_path: Path) -> bool:
@@ -200,16 +218,17 @@ def grab_frame(video_path: Path, out_path: Path) -> bool:
     return False
 
 
-def choose_thumbnail(video_path: Path, tmp_dir: Path) -> Path | None:
-    custom = find_custom_thumbnail(video_path)
+def choose_thumbnail(video_path: Path, index: str, tmp_dir: Path) -> tuple[Path | None, str]:
+    """Return (file, description) for the thumbnail to upload, or (None, reason)."""
+    custom = find_custom_thumbnail(index)
     if custom:
-        return custom
+        return custom, f"custom file {custom.name}"
     if FRAME_THUMBNAIL:
         frame = tmp_dir / "thumbnail.jpg"
         frame.unlink(missing_ok=True)
         if grab_frame(video_path, frame):
-            return frame
-    return None
+            return frame, f"frame grab (no {index}.jpg found)"
+    return None, "none"
 
 
 def client_config(client_id: str, client_secret: str) -> dict:
@@ -223,10 +242,23 @@ def client_config(client_id: str, client_secret: str) -> dict:
     }}
 
 
+def scopes_sufficient(granted) -> bool:
+    """Does a saved token carry the permissions this configuration needs?"""
+    if granted is None:  # unknown (old token file): assume yes, the API will say if not
+        return True
+    granted = set(granted)
+    if PLAYLIST_ID:
+        return FULL_SCOPE in granted
+    return bool(granted & {UPLOAD_SCOPE, FULL_SCOPE})
+
+
 def get_service():
     creds = None
     if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
+        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH))  # scopes as stored in the file
+        if not scopes_sufficient(creds.scopes):
+            print("      token.json has fewer permissions than needed now (playlist access). Logging in again...")
+            creds = None
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -304,6 +336,15 @@ def add_to_playlist(youtube, video_id: str) -> None:
     youtube.playlistItems().insert(part="snippet", body=body).execute()
 
 
+def print_checklist(uploaded: list[tuple[str, str, str]]) -> None:
+    """The API can't set a video's game title, so list the Studio pages for the manual step."""
+    if not uploaded:
+        return
+    print("\nStill to do by hand in Studio (Details -> Show more -> Category: Gaming -> Game title):")
+    for index, game, video_id in uploaded:
+        print(f"  [{index}] {game}\n        https://studio.youtube.com/video/{video_id}/edit")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dry-run", action="store_true", help="show what would be uploaded, upload nothing")
@@ -323,20 +364,25 @@ def main() -> int:
         print(f"No 'Uploaded' column in {CSV_PATH.name}.")
         return 1
 
+    if CUSTOM_THUMBNAILS_DIR is not None and not CUSTOM_THUMBNAILS_DIR.is_dir():
+        print(f"WARN  thumbnail folder not found: {CUSTOM_THUMBNAILS_DIR} (frame grabs will be used)")
+
+    pending = [r for r in rows
+               if is_true(r["Processed"]) and not is_true(r["Uploaded"]) and r["Index"].strip().isdigit()]
+    print(f"{len(pending)} video(s) pending" + (f", uploading at most {args.limit}" if args.limit else "") + ".")
+
     youtube = None
     done = skipped = failed = 0
+    uploaded: list[tuple[str, str, str]] = []  # (index, game, video id)
     try:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)
-            for row in rows:
+            for pos, row in enumerate(pending, 1):
                 if args.limit is not None and done >= args.limit:
                     break
-                if not (is_true(row["Processed"]) and not is_true(row["Uploaded"])):
-                    continue
-                if not row["Index"].strip().isdigit():
-                    continue
 
-                label = f"[{row['Index'].strip()}] {row['Game Name']}"
+                index = row["Index"].strip()
+                label = f"({pos}/{len(pending)}) [{index}] {row['Game Name']}"
                 try:
                     video_path = OUT_DIR / output_filename(row)
                     meta = finalize_metadata(build_metadata(row))
@@ -351,7 +397,8 @@ def main() -> int:
 
                 if args.dry_run:
                     print(f"DRY   {label}: {video_path.name}\n      title: {meta['title']}\n"
-                          f"      tags: {', '.join(meta['tags'])}\n      description:\n"
+                          f"      tags: {', '.join(meta['tags'])}\n      thumbnail: {describe_thumbnail(index)}\n"
+                          f"      description:\n"
                           + "\n".join("        " + line for line in meta["description"].splitlines()))
                     done += 1
                     continue
@@ -367,6 +414,7 @@ def main() -> int:
                     youtube = get_service()
 
                 print(f"UPLOAD {label}: {video_path.name} ({video_path.stat().st_size / 1e6:.0f} MB)")
+                print(f"      title: {meta['title']}")
                 try:
                     response = upload_video(youtube, video_path, meta)
                 except HttpError as e:
@@ -379,8 +427,9 @@ def main() -> int:
                     continue
 
                 video_id = response["id"]
-                print(f"      done: https://youtu.be/{video_id} "
+                print(f"      uploaded: https://youtu.be/{video_id} "
                       f"(privacy: {response.get('status', {}).get('privacyStatus', '?')})")
+                uploaded.append((index, row["Game Name"].strip(), video_id))
 
                 # Record the upload first, so a thumbnail/playlist problem never causes a re-upload.
                 row["Uploaded"] = "True"
@@ -389,25 +438,32 @@ def main() -> int:
                 except PermissionError:
                     print(f"WARN  uploaded, but {CSV_PATH.name} is locked (open in Excel?). Set Uploaded=True for "
                           f"this row by hand, otherwise it will be uploaded again.")
+                    print_checklist(uploaded)
                     return 1
                 done += 1
 
-                thumb = choose_thumbnail(video_path, tmp_dir)
+                thumb, thumb_desc = choose_thumbnail(video_path, index, tmp_dir)
                 if thumb:
                     try:
                         set_thumbnail(youtube, video_id, thumb)
+                        print(f"      thumbnail set ({thumb_desc})")
                     except HttpError as e:
                         print(f"      WARN thumbnail failed: {http_error_text(e)[:200]}")
+                else:
+                    print("      no thumbnail set")
                 if PLAYLIST_ID:
                     try:
                         add_to_playlist(youtube, video_id)
+                        print("      added to playlist")
                     except HttpError as e:
                         print(f"      WARN adding to playlist failed: {http_error_text(e)[:200]}")
     except StopRun as e:
         print(f"STOP  {e}")
+        print_checklist(uploaded)
         return 1
 
     print(f"\nDone: {done} processed, {skipped} skipped, {failed} failed.")
+    print_checklist(uploaded)
     return 1 if failed else 0
 
 

@@ -35,66 +35,13 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-
-// ═══════════════════════════════════════════════════════════════════════
-// SYNTHETIC SOUND EFFECT (Web Audio API)
-// ═══════════════════════════════════════════════════════════════════════
-let audioCtx = null;
-function playIntroSound() {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
-  if (!audioCtx) audioCtx = new AudioContext();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-
-  const now = audioCtx.currentTime;
-
-  // 1. Synthetic ZOOM (Frequency sweep + Filter sweep)
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  const filter = audioCtx.createBiquadFilter();
-
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(80, now);
-  osc.frequency.exponentialRampToValueAtTime(600, now + 0.6);
-
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(200, now);
-  filter.frequency.exponentialRampToValueAtTime(2500, now + 0.55);
-
-  gain.gain.setValueAtTime(0.01, now);
-  gain.gain.linearRampToValueAtTime(0.25, now + 0.4);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
-
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start(now);
-  osc.stop(now + 0.7);
-
-  // 2. Final "PLING" (Bell-like high sine wave with long decay)
-  const plingTime = now + 0.58; 
-  const plingOsc = audioCtx.createOscillator();
-  const plingGain = audioCtx.createGain();
-
-  plingOsc.type = 'sine';
-  plingOsc.frequency.setValueAtTime(1046.50, plingTime); // High C (C6)
-  plingOsc.frequency.exponentialRampToValueAtTime(2093.00, plingTime + 0.05);
-
-  plingGain.gain.setValueAtTime(0.01, plingTime);
-  plingGain.gain.linearRampToValueAtTime(0.3, plingTime + 0.02);
-  plingGain.gain.exponentialRampToValueAtTime(0.0001, plingTime + 1.2);
-
-  plingOsc.connect(plingGain);
-  plingGain.connect(audioCtx.destination);
-
-  plingOsc.start(plingTime);
-  plingOsc.stop(plingTime + 1.3);
-}
+import { playIntroSound, renderIntroSoundWav } from './intro-sound.js';   // the sound lives there
 
 // ═══════════════════════════════════════════════════════════════════════
 // CONFIG — tweak freely
 // ═══════════════════════════════════════════════════════════════════════
+const FLASH_AT = 1.15;     // seconds: the bloom flash, and (by default) the moment the sound starts
+
 const CFG = {
   duration: 2.0,            // seconds
   name: 'DARKSHOXX',
@@ -111,10 +58,13 @@ const CFG = {
     spinTurns: 1, spinDuration: 1.45,      // full turns, decelerating to face-on
     tilt: 0.35,                            // initial pitch (radians), settles to 0
     textStart: 0.75, textStagger: 0.05, textFade: 0.4,
-    flashAt: 1.15, flashGain: 0.2,         // bloom pulse when the spin settles
+    flashAt: FLASH_AT, flashGain: 0.2,         // bloom pulse when the spin settles
   },
 
   rings: { outerSpeed: 70, innerSpeed: -110 },   // degrees per second (in-plane spin)
+
+  // sound: { startAt: FLASH_AT },                  // when the sound starts, in intro seconds (the sound itself: intro-sound.js)
+  sound: { startAt: 0.7},                  // when the sound starts, in intro seconds (the sound itself: intro-sound.js)
 
   metal: { color: '#c3cbe3', roughness: 0.26, clearcoat: 0.7 },
   gem:   { color: '#9b6bff', roughness: 0.18 },
@@ -142,8 +92,10 @@ const params = new URLSearchParams(location.search);
 const CAPTURE = params.has('capture');
 const SHEET = params.has('sheet');
 const FIXED_T = params.has('t') ? parseFloat(params.get('t')) : null;
+const LIVE = !CAPTURE && !SHEET && FIXED_T === null;   // only the looping preview makes noise
 
 window.__duration = CFG.duration;
+window.renderIntroAudio = () => renderIntroSoundWav(CFG.duration, CFG.sound.startAt);   // used by render.mjs
 
 async function loadFont() {
   try {
@@ -444,9 +396,7 @@ async function main() {
     t = Math.max(0, t);
     const tl = CFG.timeline;
 
-    if (t > tl.flashAt && lastT <= tl.flashAt) {
-      playIntroSound();
-    }
+    if (LIVE && lastT < CFG.sound.startAt && t >= CFG.sound.startAt) playIntroSound();
     lastT = t;
 
     drawBackground(bgCtx, bgCanvas.width, bgCanvas.height, t);

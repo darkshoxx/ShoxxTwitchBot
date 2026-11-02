@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /*
   Renders intro/intro.html frame by frame and encodes it to Intro.mp4 with audio.
+  The sound comes from intro-sound.js: the same code the live preview plays.
 */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -37,55 +38,6 @@ const MIME = {
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.mp4': 'video/mp4',
 };
 
-// ═══════════════════════════════════════════════════════════════════════
-// Generate matching WAV audio for the MP4 export
-// ═══════════════════════════════════════════════════════════════════════
-function generateAudioTrack(outputPath, durationSec = 2.0, sampleRate = 44100) {
-  const numSamples = Math.floor(sampleRate * durationSec);
-  const buffer = Buffer.alloc(44 + numSamples * 2);
-
-  buffer.write('RIFF', 0);
-  buffer.writeUInt32LE(36 + numSamples * 2, 4);
-  buffer.write('WAVE', 8);
-  buffer.write('fmt ', 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(1, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(sampleRate * 2, 28);
-  buffer.writeUInt16LE(2, 32);
-  buffer.writeUInt16LE(16, 34);
-  buffer.write('data', 36);
-  buffer.writeUInt32LE(numSamples * 2, 40);
-
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    let sample = 0;
-
-    if (t >= 0 && t < 0.7) {
-      const freq = 80 + (600 - 80) * Math.min(1, t / 0.6);
-      const env = Math.max(0, 1 - (t / 0.7)) * 0.25;
-      const phase = (t * freq) % 1;
-      const saw = (phase * 2 - 1);
-      sample += saw * env;
-    }
-
-    const plingStart = 0.58;
-    if (t >= plingStart && t < plingStart + 1.2) {
-      const dt = t - plingStart;
-      const plingFreq = 1046.50;
-      const env = Math.exp(-dt * 4) * 0.3;
-      const sine = Math.sin(2 * Math.PI * plingFreq * dt);
-      sample += sine * env;
-    }
-
-    const intSample = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
-    buffer.writeInt16LE(intSample, 44 + i * 2);
-  }
-
-  fs.writeFileSync(outputPath, buffer);
-}
-
 function resolveRequest(pathname) {
   if (pathname === '/' || pathname === '/intro') return path.join(HERE, 'intro.html');
   for (const [prefix, dir] of MOUNTS) {
@@ -93,7 +45,9 @@ function resolveRequest(pathname) {
     const file = path.resolve(dir, decodeURIComponent(pathname.slice(prefix.length)));
     return file.startsWith(dir + path.sep) ? file : null;
   }
-  return null;
+  // anything else: files next to intro.html (e.g. /intro-sound.js)
+  const local = path.resolve(HERE, '.' + decodeURIComponent(pathname));
+  return local.startsWith(HERE + path.sep) ? local : null;
 }
 
 function startServer(port) {
@@ -194,9 +148,9 @@ async function main() {
     }
     process.stdout.write('\n');
 
-    // 2. Generate temporary audio file
+    // 2. Render the sound with the page's own code (intro-sound.js) into a temporary WAV
     const audioFile = path.join(OUT_DIR, 'temp_audio.wav');
-    generateAudioTrack(audioFile, duration, 44100);
+    fs.writeFileSync(audioFile, Buffer.from(await page.evaluate('window.renderIntroAudio()'), 'base64'));
 
     // 3. Render final MP4 with video and audio merged via FFmpeg
     fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });

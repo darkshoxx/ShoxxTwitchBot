@@ -164,16 +164,19 @@ def build_simple_cmd(src: Path, start: float, end: float, dst: Path) -> list[str
 
 
 def build_concat_cmd(src: Path, start: float, end: float, dst: Path) -> list[str]:
-    """intro + cut segment + outro, all normalised to the VOD's resolution/fps and re-encoded once."""
+    """intro + cut segment + outro with a 0.5s cross dissolve and cross fade."""
     vod = probe(src)
     width, height, fps = vod["width"], vod["height"], vod["fps"]
 
-    # Each segment: (file, options placed before -i, has_audio, duration)
+    # Gather segment info: (file, options, has_audio, duration)
     segments = []
     if USE_INTRO:
         info = probe(INTRO_PATH)
         segments.append((INTRO_PATH, [], info["has_audio"], info["duration"]))
-    segments.append((src, ["-ss", f"{start:.3f}", "-t", f"{end - start:.3f}"], vod["has_audio"], end - start))
+    
+    seg_duration = end - start
+    segments.append((src, ["-ss", f"{start:.3f}", "-t", f"{seg_duration:.3f}"], vod["has_audio"], seg_duration))
+    
     if USE_OUTRO:
         info = probe(OUTRO_PATH)
         segments.append((OUTRO_PATH, [], info["has_audio"], info["duration"]))
@@ -184,18 +187,58 @@ def build_concat_cmd(src: Path, start: float, end: float, dst: Path) -> list[str
 
     cmd = [FFMPEG, "-hide_banner", "-y"]
     filters = []
+    
+    # Track cumulative durations to compute xfade offsets (subtracting 0.5s overlap per transition)
+    durations = []
     for i, (path, options, has_audio, duration) in enumerate(segments):
         cmd += options + ["-i", str(path)]
-        filters.append(f"[{i}:v:0]{video_chain}[v{i}]")
+        filters.append(f"[{i}:v:0]{video_chain}[v{i}base]")
+        
+        # Standardize audio or generate silence if missing
         if has_audio:
             filters.append(f"[{i}:a:0]aformat=sample_rates={AUDIO_RATE}:channel_layouts=stereo,"
-                           f"asetpts=PTS-STARTPTS[a{i}]")
-        else:  # silent asset: generate silence so concat has audio for every segment
+                           f"asetpts=PTS-STARTPTS[a{i}base]")
+        else:
             filters.append(f"anullsrc=r={AUDIO_RATE}:cl=stereo,atrim=duration={duration:.3f},"
-                           f"asetpts=PTS-STARTPTS[a{i}]")
+                           f"asetpts=PTS-STARTPTS[a{i}base]")
+        durations.append(duration)
 
+    # If we have multiple segments, apply xfade and acrossfade
     n = len(segments)
-    filters.append("".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[v][a]")
+    
+    # Normalize base streams for smooth crossfades
+    for i in range(n):
+        filters.append(f"[v{i}base]format=yuva420p[v{i}]")
+        filters.append(f"[a{i}base]aformat=sample_rates={AUDIO_RATE}:channel_layouts=stereo[a{i}]")
+
+    if n == 1:
+        filters.append("[v0]copy[v];[a0]anull[a]")
+    else:
+        # Build xfade chain for video and acrossfade chain for audio
+        # Transition 1: Intro -> VOD segment
+        current_v = "[v0]"
+        current_a = "[a0]"
+        
+        offset = durations[0] - 0.5 # Offset is end of clip 1 minus the 0.5s dissolve duration
+        
+        for i in range(1, n):
+            next_v = f"[v{i}]"
+            next_a = f"[a{i}]"
+            
+            is_last = (i == n - 1)
+            out_v = "[v]" if is_last else f"[v_trans{i}]"
+            out_a = "[a]" if is_last else f"[a_trans{i}]"
+            
+            # Video cross dissolve (xfade)
+            filters.append(f"{current_v}{next_v}xfade=transition=fade:duration=0.5:offset={max(0, offset):.3f}{out_v}")
+            
+            # Audio cross fade (acrossfade)
+            filters.append(f"{current_a}{next_a}acrossfade=d=0.5{out_a}")
+            
+            if not is_last:
+                current_v = out_v
+                current_a = out_a
+                offset += durations[i] - 0.5
 
     cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]"]
     cmd += VIDEO_ENCODER_ARGS + ["-pix_fmt", "yuv420p"] + AUDIO_ENCODER_ARGS
