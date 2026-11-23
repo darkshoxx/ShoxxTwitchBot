@@ -138,6 +138,7 @@
   .test-btn:hover { background: var(--purple-dim); border-color: var(--purple); color: var(--purple-bright); }
   .test-btn:active { transform: scale(.97); }
   .test-btn.active { background: var(--purple-dim); border-color: var(--cyan); color: var(--cyan); box-shadow: var(--glow-cyan); }
+  .test-btn.refreshed { border-color: var(--green); color: var(--green); }
 
   /* Status dot */
   .ws-status {
@@ -265,6 +266,7 @@
   <div class="btn-row">
     <button class="test-btn toggle-btn" id="btn-notescam" onclick="toggle('notescam')">🐱 Notescam</button>
     <button class="test-btn toggle-btn" id="btn-livesplit" onclick="toggle('livesplit')">⏱ LiveSplit</button>
+    <button class="test-btn" id="btn-refresh" onclick="refreshVisuals(this)">🔄 Refresh all visuals</button>
     <button class="test-btn" onclick="fire('ban')">🔨 Ban test</button>
     <button class="test-btn" onclick="clearChat()">🗑 Clear chat</button>
   </div>
@@ -290,6 +292,28 @@
 
 <script src="/js/ws-client.js"></script>
 <script>
+async function refreshVisuals(btn) {
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '🔄 Refreshing…';
+  try {
+    const res = await fetch('/refresh', { method: 'POST' });
+    const data = await res.json();
+    btn.classList.add('refreshed');
+    btn.textContent = data.ok
+      ? `✓ Refreshed (${data.count} OBS sources)`
+      : '✓ Broadcast sent (OBS offline)';
+  } catch (_) {
+    btn.textContent = '✗ Refresh failed';
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => {
+      btn.classList.remove('refreshed');
+      btn.textContent = originalText;
+    }, 2000);
+  }
+}
+
 function clearChat() {
   fetch('/event', {
     method: 'POST',

@@ -3,6 +3,7 @@
  *
  * POST /event                        — bot pushes any event
  * POST /toggle/:source               — Stream Deck toggles notescam / livesplit
+ * POST /refresh                      — refresh all OBS browser sources (and reload connected clients)
  * GET  /layout                       — current layout state
  * GET  /test/:type                   — dev helpers
  *
@@ -75,6 +76,10 @@ async function connectOBS() {
 }
 
 async function refreshBrowserSources() {
+  if (!obs) {
+    console.warn('[obs] Not connected, skipping browser source refresh');
+    return { ok: false, error: 'OBS not connected' };
+  }
   try {
     // 1. Get a list of all inputs in OBS
     const { inputs } = await obs.call('GetInputList');
@@ -92,8 +97,10 @@ async function refreshBrowserSources() {
       });
     }
     console.log('[obs] All browser sources refreshed successfully.');
+    return { ok: true, count: browserInputs.length };
   } catch (err) {
     console.error('[obs] Failed to refresh browser sources:', err.message);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -155,6 +162,14 @@ wss.on('connection', ws => {
   ws.send(JSON.stringify({ type: 'connected' }));
   ws.send(JSON.stringify({ type: 'layout', ...layout }));
   ws.send(JSON.stringify(bingoSnapshot()));
+});
+
+// ── /refresh ──────────────────────────────────────────────
+app.post('/refresh', async (_req, res) => {
+  if (!obs) await connectOBS();
+  const obsResult = await refreshBrowserSources();
+  broadcast({ type: 'refresh' });
+  res.json({ ...obsResult, broadcast: true });
 });
 
 // ── /event ────────────────────────────────────────────────
@@ -397,6 +412,7 @@ server.listen(PORT, async () => {
   line('Toggle notescam',     `POST /toggle/notescam`);
   line('Toggle livesplit',    `POST /toggle/livesplit`);
   line('Toggle bingo square', `POST /bingo/quicktoggle`);
+  line('Refresh all visuals', `POST /refresh`);
   line('Open queue',          `POST /queue/open`);
   line('Close queue',         `POST /queue/close`);
   divider();

@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Background – darkshoxx</title>
+<link rel="stylesheet" href="/css/theme.css">
 <link rel="stylesheet" href="/css/tokens.css">
 <style>
   html, body { width:100vw; height:100vh; background: var(--void); overflow:hidden; }
@@ -45,64 +46,227 @@
 const canvas = document.getElementById('hex');
 const ctx    = canvas.getContext('2d');
 
+function readCssToken(name) {
+  const styles = getComputedStyle(document.documentElement);
+  let val = styles.getPropertyValue(name).trim();
+  const commentIdx = val.indexOf('/*');
+  if (commentIdx !== -1) val = val.slice(0, commentIdx).trim();
+  let guard = 0;
+  while (val.startsWith('var(') && val.endsWith(')') && guard < 12) {
+    const inner = val.slice(4, -1).trim();
+    const comma = inner.indexOf(',');
+    const varName = (comma === -1 ? inner : inner.slice(0, comma)).trim();
+    const fallback = comma === -1 ? '' : inner.slice(comma + 1).trim();
+    let next = styles.getPropertyValue(varName).trim();
+    const cIdx = next.indexOf('/*');
+    if (cIdx !== -1) next = next.slice(0, cIdx).trim();
+    val = next || fallback;
+    guard++;
+  }
+  return val.replace(/^["']|["']$/g, '').trim();
+}
+
 function channels(name) {
-  return getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
+  return readCssToken(name)
     .split(',')
     .map((n) => parseInt(n.trim(), 10));
 }
 
+function syncThemeFromCss() {
+  const mode = readCssToken('--theme').toLowerCase();
+  if (mode === 'christmas') {
+    document.documentElement.setAttribute('data-theme', 'christmas');
+  } else if (mode === 'regular') {
+    document.documentElement.removeAttribute('data-theme');
+  }
+}
+
+syncThemeFromCss();
+
+const SHAPE_PRESETS = {
+  hex: {
+    pitchX: (r, gap) => Math.sqrt(3) * r + gap,
+    pitchY: (r, gap) => 1.5 * r + gap,
+    staggerMode: 'col',
+    wrapMulX: 2,
+    wrapMulY: 1,
+    baseDeg: -30,
+    cellDeg: () => 0,
+  },
+  triangle1: {
+    pitchX: (r, gap) => (Math.sqrt(3) * r) * 0.5 + gap,
+    pitchY: (r, gap) => 1.5 * r + gap,
+    staggerMode: 'none',
+    wrapMulX: 2,
+    wrapMulY: 2,
+    baseDeg: -90,
+    cellDeg: (row, col) => ((row + col) % 2 === 0 ? 0 : 180),
+  },
+  triangle2: {
+    pitchX: (r, gap) => 1.3 * r + gap,
+    pitchY: (r, gap) => 1.2 * r + gap,
+    staggerMode: 'row',
+    wrapMulX: 1,
+    wrapMulY: 1,
+    baseDeg: -30,
+    cellDeg: () => 0,
+  },
+  triangle3: {
+    pitchX: (r, gap) => 1.6 * r + gap,
+    pitchY: (r, gap) => 1.4 * r + gap,
+    staggerMode: 'row',
+    wrapMulX: 2,
+    wrapMulY: 2,
+    baseDeg: -90,
+    cellDeg: (row, col) => ((row + col) % 3) * 60,
+  },
+  tree1: {
+    pitchX: (r, gap) => 1.35 * r + gap,
+    pitchY: (r, gap) => 1.55 * r + gap,
+    staggerMode: 'row',
+    wrapMulX: 1,
+    wrapMulY: 1,
+    baseDeg: 0,
+    cellDeg: () => 0,
+  },
+  tree2: {
+    pitchX: (r, gap) => 1.25 * r + gap,
+    pitchY: (r, gap) => 1.35 * r + gap,
+    staggerMode: 'col',
+    wrapMulX: 2,
+    wrapMulY: 1,
+    baseDeg: 0,
+    cellDeg: (_row, col) => (Math.abs(col) % 2 === 0 ? 0 : 180),
+  },
+  tree3: {
+    pitchX: (r, gap) => 1.8 * r + gap,
+    pitchY: (r, gap) => 1.8 * r + gap,
+    staggerMode: 'row',
+    wrapMulX: 1,
+    wrapMulY: 1,
+    baseDeg: 0,
+    cellDeg: () => 0,
+  },
+};
+
+const activeShapeName = readCssToken('--bg-shape') || 'hex';
+const preset = SHAPE_PRESETS[activeShapeName] || SHAPE_PRESETS.hex;
+
 // ── Config ────────────────────────────────────────────────
 const CFG = {
-  hexSize:     38,       // circumradius (center → vertex); drives grid pitch AND draw size
-  gap:          2,       // extra px added to center-to-center pitch (visible space between hexes)
-  // ── hexRotationDeg ─────────────────────────────────────
-  // Extra rotation for every hex (degrees). Tessellation stays aligned only at multiples of 60.
-  //   0  — flat-top (default); matches the column stagger in the loop below.
-  //  30  — pointy-top; looks right but column stagger is wrong for a perfect honeycomb.
-  //  60  — same lattice as 0, just rotated; scroll wrap math still holds.
-  //  90  — flat-top again (equivalent lattice to 0/180).
-  //  15, 45, … — breaks tiling; fine if you want a loose / organic look.
-  hexRotationDeg: 0,
-  scrollSpeedX: 0.18,   // px/frame rightward drift
-  scrollSpeedY: 0.10,   // px/frame downward drift
-  pulseSpeed:   0.008,  // glow pulse rate
-  colorA: channels('--purple-rgb'),
-  colorB: channels('--cyan-rgb'),
-  colorDim: channels('--hex-rest-rgb'),
-  bgColor: `rgb(${channels('--void-rgb').join(',')})`,
+  shape:        activeShapeName,
+  hexSize:      38,       // radius/scale parameter; drives grid pitch AND draw size
+  gap:          2,        // extra px added to center-to-center pitch
+  hexRotationDeg: 0,      // extra rotation for every glyph (degrees)
+  scrollSpeedX: 0.18,     // px/frame rightward drift
+  scrollSpeedY: 0.10,     // px/frame downward drift
+  pulseSpeed:   0.008,    // glow pulse rate
+  colorA:       channels('--purple-rgb'),
+  colorB:       channels('--cyan-rgb'),
+  colorDim:     channels('--hex-rest-rgb'),
+  bgColor:      `rgb(${channels('--void-rgb').join(',')})`,
 };
 
 let W, H, cols, rows;
 let offsetX = 0, offsetY = 0;
 let tick = 0;
 
-// ── Hex grid geometry ─────────────────────────────────────
-function hexWidth()  { return Math.sqrt(3) * CFG.hexSize; }
-function hexHeight() { return 2 * CFG.hexSize; }
+function getPitch() {
+  return {
+    pX: preset.pitchX(CFG.hexSize, CFG.gap),
+    pY: preset.pitchY(CFG.hexSize, CFG.gap),
+  };
+}
 
 function resize() {
   W = canvas.width  = window.innerWidth;
   H = canvas.height = window.innerHeight;
-  const hW = hexWidth() + CFG.gap;
-  const hH = (hexHeight() * 3/4) + CFG.gap;
-  cols = Math.ceil(W / hW) + 3;
-  rows = Math.ceil(H / hH) + 3;
+  const { pX, pY } = getPitch();
+  cols = Math.ceil(W / pX) + 4;
+  rows = Math.ceil(H / pY) + 4;
 }
 window.addEventListener('resize', resize);
 resize();
 
-function hexPath(cx, cy, r) {
-  // Built-in -30° = flat-top; hexRotationDeg rotates the whole lattice on top of that.
-  const rot = Math.PI / 180 * (CFG.hexRotationDeg - 30);
+function tracePolygon(cx, cy, r, sides, degOffset) {
+  const rot = (Math.PI / 180) * degOffset;
   ctx.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const a = rot + (Math.PI / 3) * i;
+  for (let i = 0; i < sides; i++) {
+    const a = rot + ((Math.PI * 2) / sides) * i;
     const x = cx + r * Math.cos(a);
     const y = cy + r * Math.sin(a);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
   ctx.closePath();
+}
+
+function traceTree(cx, cy, r, degOffset, tiers, trunkScale) {
+  const rot = (Math.PI / 180) * degOffset;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  const pt = (lx, ly) => [cx + lx * cos - ly * sin, cy + lx * sin + ly * cos];
+
+  ctx.beginPath();
+  const topY = -r * 0.95;
+  const botY = r * 0.72;
+  const tierH = (botY - topY) / tiers;
+
+  // Build left-to-right outer silhouette across stacked pine tiers
+  const pts = [pt(0, topY)];
+  for (let t = 0; t < tiers; t++) {
+    const frac = (t + 1) / tiers;
+    const halfW = r * 0.85 * frac;
+    const yBase = topY + tierH * (t + 1);
+    pts.push(pt(halfW, yBase));
+    if (t < tiers - 1) {
+      pts.push(pt(halfW * 0.45, yBase - tierH * 0.25));
+    }
+  }
+  // Trunk bottom-right to bottom-left
+  const trunkW = r * 0.24 * trunkScale;
+  const trunkBot = r * 0.98;
+  pts.push(pt(trunkW, botY));
+  pts.push(pt(trunkW, trunkBot));
+  pts.push(pt(-trunkW, trunkBot));
+  pts.push(pt(-trunkW, botY));
+
+  for (let t = tiers - 1; t >= 0; t--) {
+    const frac = (t + 1) / tiers;
+    const halfW = r * 0.85 * frac;
+    const yBase = topY + tierH * (t + 1);
+    if (t < tiers - 1) {
+      pts.push(pt(-halfW * 0.45, yBase - tierH * 0.25));
+    }
+    pts.push(pt(-halfW, yBase));
+  }
+
+  pts.forEach(([x, y], idx) => (idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
+}
+
+function glyphPath(cx, cy, r, row, col) {
+  const deg = preset.baseDeg + CFG.hexRotationDeg + preset.cellDeg(row, col);
+  if (CFG.shape === 'triangle1' || CFG.shape === 'triangle2') {
+    tracePolygon(cx, cy, r, 3, deg);
+    return;
+  }
+  if (CFG.shape === 'triangle3') {
+    tracePolygon(cx, cy, r * 1.12, 3, deg);
+    return;
+  }
+  if (CFG.shape === 'tree1') {
+    traceTree(cx, cy, r, deg, 3, 1.0);
+    return;
+  }
+  if (CFG.shape === 'tree2') {
+    traceTree(cx, cy, r * 0.92, deg, 2, 0.85);
+    return;
+  }
+  if (CFG.shape === 'tree3') {
+    traceTree(cx, cy, r * 1.05, deg, 2, 0.65);
+    return;
+  }
+  tracePolygon(cx, cy, r, 6, deg);
 }
 
 function lerpColor(a, b, t) {
@@ -115,17 +279,23 @@ function drawFrame() {
   ctx.fillRect(0, 0, W, H);
 
   tick++;
-  const hW = hexWidth() + CFG.gap;
-  const hH = (hexHeight() * 3/4) + CFG.gap;
+  const { pX, pY } = getPitch();
 
-  offsetX = (offsetX + CFG.scrollSpeedX) % (2 * hW);
-  offsetY = (offsetY + CFG.scrollSpeedY) % hH;
+  offsetX = (offsetX + CFG.scrollSpeedX) % (preset.wrapMulX * pX);
+  offsetY = (offsetY + CFG.scrollSpeedY) % (preset.wrapMulY * pY);
 
   for (let row = -2; row < rows; row++) {
     for (let col = -2; col < cols; col++) {
-      const stagger = col % 2 === 0 ? 0 : hH / 2;
-      const cx = col * hW - offsetX;
-      const cy = row * hH + stagger - offsetY;
+      let staggerX = 0;
+      let staggerY = 0;
+      if (preset.staggerMode === 'col' && Math.abs(col) % 2 !== 0) {
+        staggerY = pY / 2;
+      } else if (preset.staggerMode === 'row' && Math.abs(row) % 2 !== 0) {
+        staggerX = pX / 2;
+      }
+
+      const cx = col * pX + staggerX - offsetX;
+      const cy = row * pY + staggerY - offsetY;
 
       // Wave function: distance from screen center + time
       const dx = cx - W / 2;
@@ -137,11 +307,11 @@ function drawFrame() {
       const [r,g,b] = lerpColor(CFG.colorDim, lerpColor(CFG.colorA, CFG.colorB, wave), brightness * 0.85);
       const alpha = 0.3 + brightness * 0.55;
 
-      hexPath(cx, cy, CFG.hexSize);
+      glyphPath(cx, cy, CFG.hexSize, row, col);
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
       ctx.fill();
 
-      // Inner glow ring on bright hexes
+      // Inner glow ring on bright glyphs
       if (brightness > 0.7) {
         ctx.strokeStyle = `rgba(${r},${g},${b},${(brightness - 0.7) * 1.5})`;
         ctx.lineWidth = 1;
