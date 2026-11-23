@@ -119,8 +119,10 @@ auto_spin = False
 INTERFACE = r"C:\Code\GithubRepos\Alt-Tab-Randomizer\interface.txt"
 POKE_LOG = os.path.join(HERE, "pokelog.txt")
 TOKEN_FILE = os.path.join(HERE, "user_token.json")
-BAD_TERMS_START = ["aiviewersst", "aiviewerstw", "wantpopular", "wannamorevi", "topviewerss","bestviewers", "cheapviewer", "cheapfollow", "bestfollowe", "viewersstre", "estviewersm"]
-BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers", "op58.online", "eamboo.live", "vethespace)", "reamboo.org", "xadsxonline", "reamboo.com", "wichmax.com"]
+BAD_TERMS_START = ["viewersonth", "aiviewersst", "aiviewerstw", "wantpopular", "wannamorevi", "topviewerss","bestviewers", "cheapviewer", "cheapfollow", "bestfollowe", "viewersstre", "estviewersm"]
+BAD_TERMS_END = ["realviewers", "heapviewers", "apfollowers", "stfollowers", "op58.online", "eamboo.live", "vethespace)", "reamboo.org", "xadsxonline", "reamboo.com", "wichmax.com", "romotion.ru"]
+BAD_CANDIDATE =  "ᐯ𝐼𝐄ᗯ𝑬ᖇＳ 𝕆ᑎ 𝖳ᕼ𝓔 𝕊Ｔᖇᴇᗩᗰ 𝐒𝑇ᖇ𝐄ᗩᗰ_ᑭᖇᴏᗰ𝑂Ｔ𝐼ᴏᑎ 𝑑ᴏ𝚝 𝓻𝑢"
+BAD_CANDIDATE_RENDERED_IN_LOG =  " 𝐼𝐄 𝑬 Ｓ 𝕆  𝖳 𝓔 𝕊Ｔ ᴇ   𝐒𝑇 𝐄  _  ᴏ 𝑂Ｔ𝐼ᴏ  𝑑ᴏ𝚝 𝓻𝑢"
 BAD_WITH_APPENDAGE = [shoxxword + starter for shoxxword in ["darkshoxx", "@darkshoxx"] for starter in BAD_TERMS_START]
 BAN_TIMEOUT = 5
 

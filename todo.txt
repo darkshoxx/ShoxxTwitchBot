@@ -1,0 +1,13 @@
+Automate deleting shortcut and launching the game ?
+also pokemon still exits shell
+use tablet
+update bingo labels online
+"no" and !next out of chat
+all videos no longer long enough 
+-> make length dynamic based on video length
+
+New bad message.
+Plan: 
+- Create fuzzy substitution of "creative letters" down to ascii
+- fuzzy check for contents
+- count number of substitutions, if too many in first message, BOP!

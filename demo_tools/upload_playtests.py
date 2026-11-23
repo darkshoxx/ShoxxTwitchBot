@@ -5,6 +5,11 @@ Uploads every CSV row where Processed is True and Uploaded is not True, using th
 file "<Game Name> - <Studio>.mp4" in the output folder configured in playtest_editor.py.
 Uploaded is set to True right after YouTube has accepted the video.
 
+If discord_scraper.py has collected data for a game (discord_data.json), the description gets the
+Steam link, the dev's AI declaration and socials, and your feedback, and the video is uploaded as
+public or unlisted depending on what the dev answered. Without data, the fields stay empty and
+PRIVACY_STATUS is used.
+
 Setup (once):
     pip install google-api-python-client google-auth-oauthlib python-dotenv
     Put the OAuth client ID and secret (type "Desktop app") in a .env file, see ENV_PATH below.
@@ -23,6 +28,7 @@ Gaming category and prints a checklist of Studio links at the end for that manua
 """
 
 import argparse
+import json
 import os
 import random
 import subprocess
@@ -36,6 +42,7 @@ import httplib2
 
 from playtest_editor import (CSV_PATH, FFMPEG, OUT_DIR, is_true, load_csv,
                              output_filename, save_csv)
+from playtest_paths import DATA_PATH, THUMBS_DIR, find_record
 
 try:
     from dotenv import load_dotenv
@@ -62,7 +69,10 @@ TOKEN_PATH = SCRIPT_DIR / "token.json"  # created on first login (contains a ref
                                         # private / out of git); delete it to log in again
 
 # --- Video settings ----------------------------------------------------------- #
-PRIVACY_STATUS = "private"       # "private" | "unlisted" | "public" (forced private if unaudited)
+PRIVACY_STATUS = "private"       # used when there is no Discord data for the game
+PRIVACY_PUBLIC = "public"        # the dev said Yes to a public video (or didn't say anything)
+PRIVACY_NOT_PUBLIC = "unlisted"  # the dev said No: not searchable, but still shown in the playlist
+# ("private" | "unlisted" | "public". While the Google project is unaudited, YouTube forces every API upload to private.)
 CATEGORY_ID = "20"               # 20 = Gaming, 22 = People & Blogs, 24 = Entertainment, 27 = Education
 DEFAULT_LANGUAGE = "en"          # language of title/description
 DEFAULT_AUDIO_LANGUAGE = "en"    # spoken language
@@ -80,6 +90,8 @@ NOTIFY_SUBSCRIBERS = False       # only relevant once a video is public
 #   {date}   playtest date formatted with DATE_FORMAT
 #   {raw_date} playtest date exactly as in the CSV (dd-mm-yy)
 #   {video_index} VOD number (several playtests can share one VOD)
+# From discord_scraper.py (empty if there is no data for the game):
+#   {steam_url}  {ai_declaration}  {socials}  {feedback}
 # Literal curly braces in a template must be doubled: {{ and }}.
 # For anything fancier (conditions, per-game text), edit build_metadata() below.
 DATE_FORMAT = "%d %B %Y"         # "05 September 2026"
@@ -91,10 +103,17 @@ DESCRIPTION_TEMPLATE = """Playtest of "{game}" by {studio}, recorded live on {da
 This is an unscripted first-impressions playtest of a game in development. Feedback was passed on to the developer.
 
 Game: {game}
+Steam: {steam_url}
 Developer: {studio}
+
 Dev's AI Declaration:
+{ai_declaration}
+
+Dev's socials:
+{socials}
 
 Feedback given:
+{feedback}
 
 Get Feedback:
 Want feedback as well? Join the discord linked on my twitch page (not linking the discord here because bots...)
@@ -108,12 +127,13 @@ TAG_TEMPLATES = ["{game}", "{studio}", "playtest", "gameplay", "indie game", "pl
 
 # --- Thumbnails ------------------------------------------------------------------ #
 # Order of preference:
-#   1. A file in CUSTOM_THUMBNAILS_DIR named after the CSV Index, e.g. "1.jpg" for Index 1
+#   1. A file in CUSTOM_THUMBNAILS_DIR named like the video, "<Game> - <Studio>.jpg" (what
+#      make_thumbnails.py produces), or else named after the CSV Index, e.g. "1.jpg" for Index 1
 #      (.jpg / .jpeg / .png). Set the directory to None to disable.
 #   2. A frame grabbed from the video with ffmpeg (if FRAME_THUMBNAIL is True).
 #   3. Nothing: YouTube picks one of its auto-generated frames.
 # Custom thumbnails need a channel with phone verification, max 2 MB, 16:9 recommended (1280x720).
-CUSTOM_THUMBNAILS_DIR = Path(r"D:\DANVID\darkshoxx\Demos + Puzzles\Thumbnails")     # e.g. Path(r"D:\DANVID\darkshoxx\Demos + Puzzles\Thumbnails")
+CUSTOM_THUMBNAILS_DIR = THUMBS_DIR     # see playtest_paths.py
 FRAME_THUMBNAIL = True
 FRAME_THUMBNAIL_AT_SECONDS = 60  # where in the video to grab the frame (falls back to 0s if too short)
 
@@ -123,8 +143,9 @@ FRAME_THUMBNAIL_AT_SECONDS = 60  # where in the video to grab the frame (falls b
 PLAYLIST_ID = "PLb3f9SzNBosg"               # e.g. "PLxxxxxxxxxxxxxxxx"
 
 
-def build_metadata(row: dict) -> dict:
-    """Return {"title", "description", "tags"} for one CSV row. Edit freely."""
+def build_metadata(row: dict, record: dict | None = None) -> dict:
+    """Return {"title", "description", "tags"} for one CSV row (+ its Discord data, if any). Edit freely."""
+    record = record or {}
     raw_date = row["Date"].strip()
     try:
         date = datetime.strptime(raw_date, "%d-%m-%y").strftime(DATE_FORMAT)
@@ -138,6 +159,10 @@ def build_metadata(row: dict) -> dict:
         "date": date,
         "raw_date": raw_date,
         "video_index": row["Video Index"].strip(),
+        "steam_url": record.get("steam_url") or "",
+        "ai_declaration": record.get("ai_declaration") or "",
+        "socials": record.get("socials") or "",
+        "feedback": record.get("feedback") or "",
     }
     return {
         "title": TITLE_TEMPLATE.format(**fields),
@@ -187,23 +212,28 @@ def finalize_metadata(meta: dict) -> dict:
     return {"title": title, "description": description, "tags": tags}
 
 
-def find_custom_thumbnail(index: str) -> Path | None:
-    """<CUSTOM_THUMBNAILS_DIR>/<Index>.jpg (or .jpeg / .png)."""
-    if CUSTOM_THUMBNAILS_DIR is None:
+def find_custom_thumbnail(stem: str, index: str, saved_as: str | None = None) -> Path | None:
+    """A file in CUSTOM_THUMBNAILS_DIR called '<video name>', '<Index>', '<Index>_<anything>' or the name the scraper
+    recorded for it (.jpg / .jpeg / .png; case doesn't matter). If several exist, the most recently changed one wins."""
+    if CUSTOM_THUMBNAILS_DIR is None or not CUSTOM_THUMBNAILS_DIR.is_dir():
         return None
-    for ext in (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"):
-        candidate = CUSTOM_THUMBNAILS_DIR / f"{index}{ext}"
-        if candidate.exists():
-            return candidate
-    return None
+    recorded = Path(saved_as).stem.lower() if saved_as else None
+    found = []
+    for f in CUSTOM_THUMBNAILS_DIR.iterdir():
+        if not f.is_file() or f.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+            continue
+        name = f.stem.lower()
+        if name == stem.lower() or name == index or name.startswith(f"{index}_") or name == recorded:
+            found.append(f)
+    return max(found, key=lambda f: f.stat().st_mtime) if found else None
 
 
-def describe_thumbnail(index: str) -> str:
-    custom = find_custom_thumbnail(index)
+def describe_thumbnail(stem: str, index: str, saved_as: str | None = None) -> str:
+    custom = find_custom_thumbnail(stem, index, saved_as)
     if custom:
         return f"custom file {custom.name}"
     if FRAME_THUMBNAIL:
-        return f"frame grab at {FRAME_THUMBNAIL_AT_SECONDS}s (no {index}.jpg found)"
+        return f"frame grab at {FRAME_THUMBNAIL_AT_SECONDS}s (no '{index}.jpg', '{index}_....jpg' or '{stem}.jpg' found)"
     return "none (YouTube will pick one)"
 
 
@@ -218,16 +248,16 @@ def grab_frame(video_path: Path, out_path: Path) -> bool:
     return False
 
 
-def choose_thumbnail(video_path: Path, index: str, tmp_dir: Path) -> tuple[Path | None, str]:
+def choose_thumbnail(video_path: Path, index: str, tmp_dir: Path, saved_as: str | None = None) -> tuple[Path | None, str]:
     """Return (file, description) for the thumbnail to upload, or (None, reason)."""
-    custom = find_custom_thumbnail(index)
+    custom = find_custom_thumbnail(video_path.stem, index, saved_as)
     if custom:
         return custom, f"custom file {custom.name}"
     if FRAME_THUMBNAIL:
         frame = tmp_dir / "thumbnail.jpg"
         frame.unlink(missing_ok=True)
         if grab_frame(video_path, frame):
-            return frame, f"frame grab (no {index}.jpg found)"
+            return frame, "frame grab (no custom thumbnail found)"
     return None, "none"
 
 
@@ -277,7 +307,7 @@ def http_error_text(e: "HttpError") -> str:
     return e.content.decode("utf-8", errors="replace") if e.content else str(e)
 
 
-def upload_video(youtube, path: Path, meta: dict) -> dict:
+def upload_video(youtube, path: Path, meta: dict, privacy: str) -> dict:
     body = {
         "snippet": {
             "title": meta["title"],
@@ -288,7 +318,7 @@ def upload_video(youtube, path: Path, meta: dict) -> dict:
             "defaultAudioLanguage": DEFAULT_AUDIO_LANGUAGE,
         },
         "status": {
-            "privacyStatus": PRIVACY_STATUS,
+            "privacyStatus": privacy,
             "selfDeclaredMadeForKids": MADE_FOR_KIDS,
             "embeddable": EMBEDDABLE,
             "publicStatsViewable": PUBLIC_STATS_VIEWABLE,
@@ -336,6 +366,23 @@ def add_to_playlist(youtube, video_id: str) -> None:
     youtube.playlistItems().insert(part="snippet", body=body).execute()
 
 
+def load_discord_data() -> dict:
+    """discord_data.json written by discord_scraper.py (empty if it doesn't exist)."""
+    if not DATA_PATH.exists():
+        return {}
+    try:
+        return json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print(f"WARN  could not read {DATA_PATH.name}: {e}")
+        return {}
+
+
+def privacy_for(record: dict | None) -> str:
+    if not record:
+        return PRIVACY_STATUS
+    return PRIVACY_PUBLIC if record.get("public", True) else PRIVACY_NOT_PUBLIC
+
+
 def print_checklist(uploaded: list[tuple[str, str, str]]) -> None:
     """The API can't set a video's game title, so list the Studio pages for the manual step."""
     if not uploaded:
@@ -367,6 +414,7 @@ def main() -> int:
     if CUSTOM_THUMBNAILS_DIR is not None and not CUSTOM_THUMBNAILS_DIR.is_dir():
         print(f"WARN  thumbnail folder not found: {CUSTOM_THUMBNAILS_DIR} (frame grabs will be used)")
 
+    discord_data = load_discord_data()
     pending = [r for r in rows
                if is_true(r["Processed"]) and not is_true(r["Uploaded"]) and r["Index"].strip().isdigit()]
     print(f"{len(pending)} video(s) pending" + (f", uploading at most {args.limit}" if args.limit else "") + ".")
@@ -385,7 +433,9 @@ def main() -> int:
                 label = f"({pos}/{len(pending)}) [{index}] {row['Game Name']}"
                 try:
                     video_path = OUT_DIR / output_filename(row)
-                    meta = finalize_metadata(build_metadata(row))
+                    record, record_note = find_record(discord_data, index, video_path.stem)
+                    privacy = privacy_for(record)
+                    meta = finalize_metadata(build_metadata(row, record))
                 except (ValueError, KeyError) as e:
                     print(f"SKIP  {label}: {e}")
                     skipped += 1
@@ -397,7 +447,9 @@ def main() -> int:
 
                 if args.dry_run:
                     print(f"DRY   {label}: {video_path.name}\n      title: {meta['title']}\n"
-                          f"      tags: {', '.join(meta['tags'])}\n      thumbnail: {describe_thumbnail(index)}\n"
+                          f"      privacy: {privacy}   discord data: {('yes ' + record_note) if record else 'NO (' + record_note + ')'}\n"
+                          f"      tags: {', '.join(meta['tags'])}\n"
+                          f"      thumbnail: {describe_thumbnail(video_path.stem, index, (record or {}).get('thumbnail'))}\n"
                           f"      description:\n"
                           + "\n".join("        " + line for line in meta["description"].splitlines()))
                     done += 1
@@ -415,8 +467,14 @@ def main() -> int:
 
                 print(f"UPLOAD {label}: {video_path.name} ({video_path.stat().st_size / 1e6:.0f} MB)")
                 print(f"      title: {meta['title']}")
+                print(f"      privacy: {privacy}")
+                if record:
+                    print("      discord data: found" + (f" ({record_note})" if record_note else ""))
+                else:
+                    print(f"      WARN no Discord data for '{video_path.stem}' ({record_note}). "
+                          f"Run: python discord_scraper.py --csv")
                 try:
-                    response = upload_video(youtube, video_path, meta)
+                    response = upload_video(youtube, video_path, meta, privacy)
                 except HttpError as e:
                     print(f"FAIL  {label}: {http_error_text(e)[:300]}")
                     failed += 1
@@ -442,7 +500,7 @@ def main() -> int:
                     return 1
                 done += 1
 
-                thumb, thumb_desc = choose_thumbnail(video_path, index, tmp_dir)
+                thumb, thumb_desc = choose_thumbnail(video_path, index, tmp_dir, (record or {}).get("thumbnail"))
                 if thumb:
                     try:
                         set_thumbnail(youtube, video_id, thumb)
