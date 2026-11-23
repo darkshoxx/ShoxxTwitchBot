@@ -2,15 +2,33 @@
    tokens.css  —  darkshoxx stream overlay design system
    ═══════════════════════════════════════════════════════════ */
 
+@import url('./theme.css');
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;700&display=swap');
 
 :root {
-  /* ── Palette channels ──
-     These comma-separated RGB triplets are the only colour literals.
-     Every alias, wash, glow, and gradient below is derived from them.
-     Seasonal swap (later): retint --cyan-*, --purple-*, --purple-bright-rgb,
-     --purple-dim-rgb, --cyan-dim-rgb, and --user-hue-*. */
+  /* ── Palette templates (single source of truth for swappable hues) ──
+     Channel triplets are comma-separated R, G, B integers.
+     Red and green templates are staged for seasonal swaps. */
+  --cyan-template:   0, 245, 255;   /* #00f5ff default major hue */
+  --purple-template: 124, 58, 237;  /* #7c3aed default minor hue */
+  --red-template:    196, 30, 58;   /* #c41e3a seasonal red */
+  --green-template:  34, 139, 34;   /* #228b22 seasonal green */
 
+  /* ── Semantic role layer ──
+     External HTML tokens stay unchanged; flip via [data-theme="christmas"]
+     or edit --major-rgb / --minor-rgb directly. */
+  --major-rgb: var(--cyan-template);
+  --minor-rgb: var(--purple-template);
+  --major:     rgb(var(--major-rgb));
+  --minor:     rgb(var(--minor-rgb));
+
+  /* ── Math scale knobs for derived shades ──
+     --dim-scale multiplies RGB channels (< 1 darkens).
+     --bright-mix blends each channel toward 255 white (0..1). */
+  --dim-scale:  0.6;
+  --bright-mix: 0.4;
+
+  /* ── Palette channels ── */
   --void-rgb:          13, 15, 20;    /* #0d0f14 near-black base */
   --surface-rgb:       20, 23, 32;    /* #141720 panel background */
   --elevated-rgb:      30, 34, 53;    /* #1e2235 raised element */
@@ -19,11 +37,8 @@
   --hex-rest-rgb:      30, 40, 70;    /* resting hex-grid fill */
   --border-rgb:        42, 48, 80;    /* #2a3050 subtle divider */
 
-  --purple-rgb:        124, 58, 237;  /* #7c3aed primary accent */
-  --purple-dim-rgb:    74, 29, 150;   /* #4a1d96 muted purple */
-  --purple-bright-rgb: 192, 132, 252; /* #c084fc lit purple text */
-  --cyan-rgb:          0, 245, 255;   /* #00f5ff highlight / glow */
-  --cyan-dim-rgb:      0, 184, 196;   /* #00b8c4 */
+  --purple-rgb:        var(--minor-rgb);
+  --cyan-rgb:          var(--major-rgb);
   --amber-rgb:         245, 158, 11;  /* #f59e0b warm event color */
   --amber-dim-rgb:     146, 64, 14;   /* #92400e */
   --text-rgb:          226, 232, 240; /* #e2e8f0 body copy */
@@ -34,25 +49,27 @@
   --white-rgb:         255, 255, 255;
   --black-rgb:         0, 0, 0;
 
-  --void:          rgb(var(--void-rgb));
-  --surface:       rgb(var(--surface-rgb));
-  --elevated:      rgb(var(--elevated-rgb));
-  --hud:           rgb(var(--hud-rgb));
-  --matte:         rgb(var(--matte-rgb));
-  --border:        rgb(var(--border-rgb));
-  --purple:        rgb(var(--purple-rgb));
-  --purple-dim:    rgb(var(--purple-dim-rgb));
-  --purple-bright: rgb(var(--purple-bright-rgb));
-  --cyan:          rgb(var(--cyan-rgb));
-  --cyan-dim:      rgb(var(--cyan-dim-rgb));
-  --amber:         rgb(var(--amber-rgb));
-  --amber-dim:     rgb(var(--amber-dim-rgb));
-  --text:          rgb(var(--text-rgb));
-  --text-muted:    rgb(var(--text-muted-rgb));
-  --danger:        rgb(var(--danger-rgb));
-  --green:         rgb(var(--green-rgb));
-  --gold:          rgb(var(--gold-rgb));
-  --white:         rgb(var(--white-rgb));
+  --void:       rgb(var(--void-rgb));
+  --surface:    rgb(var(--surface-rgb));
+  --elevated:   rgb(var(--elevated-rgb));
+  --hud:        rgb(var(--hud-rgb));
+  --matte:      rgb(var(--matte-rgb));
+  --border:     rgb(var(--border-rgb));
+  --purple:     var(--minor);
+  --cyan:       var(--major);
+  --amber:      rgb(var(--amber-rgb));
+  --amber-dim:  rgb(var(--amber-dim-rgb));
+  --text:       rgb(var(--text-rgb));
+  --text-muted: rgb(var(--text-muted-rgb));
+  --danger:     rgb(var(--danger-rgb));
+  --green:      rgb(var(--green-rgb));
+  --gold:       rgb(var(--gold-rgb));
+  --white:      rgb(var(--white-rgb));
+
+  /* Math-derived dim & bright variants (requires modern Chromium / OBS CEF with relative color syntax) */
+  --purple-dim:    rgb(from var(--minor) calc(r * var(--dim-scale)) calc(g * var(--dim-scale)) calc(b * var(--dim-scale)));
+  --purple-bright: rgb(from var(--minor) calc(r + (255 - r) * var(--bright-mix)) calc(g + (255 - g) * var(--bright-mix)) calc(b + (255 - b) * var(--bright-mix)));
+  --cyan-dim:      rgb(from var(--major) calc(r * var(--dim-scale)) calc(g * var(--dim-scale)) calc(b * var(--dim-scale)));
 
   /* ── Alpha washes (same channels, fixed opacities) ── */
   --void-a00:     rgba(var(--void-rgb), 0);
@@ -67,21 +84,21 @@
   --hud-a80:      rgba(var(--hud-rgb), .80);
   --matte-a85:    rgba(var(--matte-rgb), .85);
 
-  --cyan-a07:  rgba(var(--cyan-rgb), .07);
-  --cyan-a08:  rgba(var(--cyan-rgb), .08);
-  --cyan-a10:  rgba(var(--cyan-rgb), .10);
-  --cyan-a12:  rgba(var(--cyan-rgb), .12);
-  --cyan-a15:  rgba(var(--cyan-rgb), .15);
-  --cyan-a18:  rgba(var(--cyan-rgb), .18);
-  --cyan-a40:  rgba(var(--cyan-rgb), .40);
-  --cyan-a53:  rgba(var(--cyan-rgb), .533); /* #00f5ff88 */
+  --cyan-a07:  rgba(var(--major-rgb), .07);
+  --cyan-a08:  rgba(var(--major-rgb), .08);
+  --cyan-a10:  rgba(var(--major-rgb), .10);
+  --cyan-a12:  rgba(var(--major-rgb), .12);
+  --cyan-a15:  rgba(var(--major-rgb), .15);
+  --cyan-a18:  rgba(var(--major-rgb), .18);
+  --cyan-a40:  rgba(var(--major-rgb), .40);
+  --cyan-a53:  rgba(var(--major-rgb), .533); /* #00f5ff88 */
 
-  --purple-a12: rgba(var(--purple-rgb), .12);
-  --purple-a15: rgba(var(--purple-rgb), .15);
-  --purple-a18: rgba(var(--purple-rgb), .18);
-  --purple-a20: rgba(var(--purple-rgb), .20);
-  --purple-a25: rgba(var(--purple-rgb), .25);
-  --purple-a53: rgba(var(--purple-rgb), .533); /* #7c3aed88 */
+  --purple-a12: rgba(var(--minor-rgb), .12);
+  --purple-a15: rgba(var(--minor-rgb), .15);
+  --purple-a18: rgba(var(--minor-rgb), .18);
+  --purple-a20: rgba(var(--minor-rgb), .20);
+  --purple-a25: rgba(var(--minor-rgb), .25);
+  --purple-a53: rgba(var(--minor-rgb), .533); /* #7c3aed88 */
 
   --amber-a08: rgba(var(--amber-rgb), .08);
   --amber-a12: rgba(var(--amber-rgb), .12);
@@ -105,22 +122,22 @@
   --black-a12: rgba(var(--black-rgb), .12);
 
   /* ── Glow shadows ── */
-  --glow-cyan:    0 0 8px rgba(var(--cyan-rgb), .6), 0 0 24px rgba(var(--cyan-rgb), .25);
-  --glow-purple:  0 0 8px rgba(var(--purple-rgb), .7), 0 0 24px rgba(var(--purple-rgb), .3);
-  --glow-amber:   0 0 8px rgba(var(--amber-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3);
-  --glow-green:   0 0 6px rgb(var(--green-rgb));
-  --glow-dot-cyan:   0 0 4px rgb(var(--cyan-rgb));
-  --glow-dot-purple: 0 0 4px rgb(var(--purple-bright-rgb));
+  --glow-cyan:       0 0 8px rgba(var(--major-rgb), .6), 0 0 24px rgba(var(--major-rgb), .25);
+  --glow-purple:     0 0 8px rgba(var(--minor-rgb), .7), 0 0 24px rgba(var(--minor-rgb), .3);
+  --glow-amber:      0 0 8px rgba(var(--amber-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3);
+  --glow-green:      0 0 6px rgb(var(--green-rgb));
+  --glow-dot-cyan:   0 0 4px var(--major);
+  --glow-dot-purple: 0 0 4px var(--purple-bright);
   --glow-dot-amber:  0 0 4px rgb(var(--amber-rgb));
-  --glow-danger:  0 0 6px rgb(var(--danger-rgb));
-  --text-glow-cyan: 0 0 6px rgb(var(--cyan-rgb));
+  --glow-danger:     0 0 6px rgb(var(--danger-rgb));
+  --text-glow-cyan:  0 0 6px var(--major);
 
   --shadow-cell-called: inset 0 0 8px var(--cyan-a15), var(--glow-cyan);
   --shadow-cell-bingo:  inset 0 0 10px var(--amber-a20), var(--glow-amber);
 
-  /* Shared cyan/purple frame treatment */
-  --shadow-frame: 6px 6px 15px var(--purple-a20), -6px 6px 15px var(--purple-a20), inset 0 -2px 10px var(--cyan-a10);
-  --shadow-frame-edge: 6px 6px 15px var(--purple-a20), inset -2px -2px 10px var(--cyan-a10);
+  /* Shared major/minor frame treatment */
+  --shadow-frame:       6px 6px 15px var(--purple-a20), -6px 6px 15px var(--purple-a20), inset 0 -2px 10px var(--cyan-a10);
+  --shadow-frame-edge:  6px 6px 15px var(--purple-a20), inset -2px -2px 10px var(--cyan-a10);
   --shadow-frame-alert: 6px 6px 15px var(--purple-a25), -6px 6px 15px var(--purple-a25), inset 0 -2px 10px var(--cyan-a15);
 
   /* ── Gradients ── */
@@ -136,8 +153,8 @@
   --grad-name-badge:   linear-gradient(90deg, var(--purple-dim), var(--surface));
   --grad-hud-edge:     linear-gradient(90deg, transparent, var(--cyan), transparent);
 
-  --filter-hex-glow-from: drop-shadow(0 0 4px rgb(var(--purple-rgb))) drop-shadow(0 0 12px var(--purple-a53));
-  --filter-hex-glow-to:   drop-shadow(0 0 8px rgb(var(--cyan-rgb))) drop-shadow(0 0 20px var(--cyan-a53));
+  --filter-hex-glow-from: drop-shadow(0 0 4px var(--minor)) drop-shadow(0 0 12px var(--purple-a53));
+  --filter-hex-glow-to:   drop-shadow(0 0 8px var(--major)) drop-shadow(0 0 20px var(--cyan-a53));
 
   /* Fallback chat-name hue window (blue → purple → cyan). Shift for a seasonal palette. */
   --user-hue-start: 180;
@@ -167,6 +184,11 @@
   /* ── Motion ── */
   --ease-out-expo: cubic-bezier(0.16,1,0.3,1);
   --ease-spring:   cubic-bezier(0.34,1.56,0.64,1);
+}
+
+:root[data-theme="christmas"] {
+  --major-rgb: var(--red-template);
+  --minor-rgb: var(--green-template);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

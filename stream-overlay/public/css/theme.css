@@ -1,0 +1,7 @@
+:root {
+  /* Active theme mode: regular | christmas */
+  --theme: "regular";
+
+  /* Background canvas glyph: hex | tree | triangle */
+  --bg-shape: "hex";
+}
