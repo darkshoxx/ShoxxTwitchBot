@@ -98,7 +98,7 @@
   }
   .obs-url:hover { background: var(--border); }
   .obs-url .copy-hint { font-size: 9px; color: var(--text-muted); flex-shrink: 0; }
-  .obs-url.copied { border-color: #34d399; color: #34d399; }
+  .obs-url.copied { border-color: var(--green); color: var(--green); }
 
   /* Size info */
   .size-info {
@@ -135,7 +135,7 @@
     transition: all .15s;
     display: flex; align-items: center; gap: 6px;
   }
-  .test-btn:hover { background: var(--purple-dim); border-color: var(--purple); color: #c084fc; }
+  .test-btn:hover { background: var(--purple-dim); border-color: var(--purple); color: var(--purple-bright); }
   .test-btn:active { transform: scale(.97); }
   .test-btn.active { background: var(--purple-dim); border-color: var(--cyan); color: var(--cyan); box-shadow: var(--glow-cyan); }
 
@@ -148,7 +148,7 @@
     margin-top: 32px;
   }
   .ws-dot { width:8px; height:8px; border-radius:50%; background: var(--danger); }
-  .ws-dot.connected { background: #34d399; box-shadow: 0 0 6px #34d399; }
+  .ws-dot.connected { background: var(--green); box-shadow: var(--glow-green); }
 </style>
 </head>
 <body>

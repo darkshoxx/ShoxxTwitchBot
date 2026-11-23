@@ -5,25 +5,145 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;700&display=swap');
 
 :root {
-  /* ── Palette ── */
-  --void:      #0d0f14;   /* near-black base */
-  --surface:   #141720;   /* panel background */
-  --elevated:  #1e2235;   /* raised element */
-  --border:    #2a3050;   /* subtle divider */
-  --purple:    #7c3aed;   /* primary accent */
-  --purple-dim:#4a1d96;   /* muted purple */
-  --cyan:      #00f5ff;   /* highlight / glow */
-  --cyan-dim:  #00b8c4;
-  --amber:     #f59e0b;   /* warm event color */
-  --amber-dim: #92400e;
-  --text:      #e2e8f0;   /* body copy */
-  --text-muted:#8892aa;   /* secondary copy */
-  --danger:    #ef4444;
+  /* ── Palette channels ──
+     These comma-separated RGB triplets are the only colour literals.
+     Every alias, wash, glow, and gradient below is derived from them.
+     Seasonal swap (later): retint --cyan-*, --purple-*, --purple-bright-rgb,
+     --purple-dim-rgb, --cyan-dim-rgb, and --user-hue-*. */
+
+  --void-rgb:          13, 15, 20;    /* #0d0f14 near-black base */
+  --surface-rgb:       20, 23, 32;    /* #141720 panel background */
+  --elevated-rgb:      30, 34, 53;    /* #1e2235 raised element */
+  --hud-rgb:           14, 17, 26;    /* #0e111a HUD widget fill */
+  --matte-rgb:         10, 12, 18;    /* #0a0c12 framed-video fill */
+  --hex-rest-rgb:      30, 40, 70;    /* resting hex-grid fill */
+  --border-rgb:        42, 48, 80;    /* #2a3050 subtle divider */
+
+  --purple-rgb:        124, 58, 237;  /* #7c3aed primary accent */
+  --purple-dim-rgb:    74, 29, 150;   /* #4a1d96 muted purple */
+  --purple-bright-rgb: 192, 132, 252; /* #c084fc lit purple text */
+  --cyan-rgb:          0, 245, 255;   /* #00f5ff highlight / glow */
+  --cyan-dim-rgb:      0, 184, 196;   /* #00b8c4 */
+  --amber-rgb:         245, 158, 11;  /* #f59e0b warm event color */
+  --amber-dim-rgb:     146, 64, 14;   /* #92400e */
+  --text-rgb:          226, 232, 240; /* #e2e8f0 body copy */
+  --text-muted-rgb:    136, 146, 170; /* #8892aa secondary copy */
+  --danger-rgb:        239, 68, 68;   /* #ef4444 */
+  --green-rgb:         52, 211, 153;  /* #34d399 success / open / spin */
+  --gold-rgb:          250, 204, 21;  /* #facc15 pokemon */
+  --white-rgb:         255, 255, 255;
+  --black-rgb:         0, 0, 0;
+
+  --void:          rgb(var(--void-rgb));
+  --surface:       rgb(var(--surface-rgb));
+  --elevated:      rgb(var(--elevated-rgb));
+  --hud:           rgb(var(--hud-rgb));
+  --matte:         rgb(var(--matte-rgb));
+  --border:        rgb(var(--border-rgb));
+  --purple:        rgb(var(--purple-rgb));
+  --purple-dim:    rgb(var(--purple-dim-rgb));
+  --purple-bright: rgb(var(--purple-bright-rgb));
+  --cyan:          rgb(var(--cyan-rgb));
+  --cyan-dim:      rgb(var(--cyan-dim-rgb));
+  --amber:         rgb(var(--amber-rgb));
+  --amber-dim:     rgb(var(--amber-dim-rgb));
+  --text:          rgb(var(--text-rgb));
+  --text-muted:    rgb(var(--text-muted-rgb));
+  --danger:        rgb(var(--danger-rgb));
+  --green:         rgb(var(--green-rgb));
+  --gold:          rgb(var(--gold-rgb));
+  --white:         rgb(var(--white-rgb));
+
+  /* ── Alpha washes (same channels, fixed opacities) ── */
+  --void-a00:     rgba(var(--void-rgb), 0);
+  --void-a85:     rgba(var(--void-rgb), .85);
+  --void-a95:     rgba(var(--void-rgb), .95);
+  --surface-a80:  rgba(var(--surface-rgb), .80);
+  --surface-a82:  rgba(var(--surface-rgb), .82);
+  --surface-a85:  rgba(var(--surface-rgb), .85);
+  --surface-a92:  rgba(var(--surface-rgb), .92);
+  --surface-a97:  rgba(var(--surface-rgb), .97);
+  --elevated-a97: rgba(var(--elevated-rgb), .97);
+  --hud-a80:      rgba(var(--hud-rgb), .80);
+  --matte-a85:    rgba(var(--matte-rgb), .85);
+
+  --cyan-a07:  rgba(var(--cyan-rgb), .07);
+  --cyan-a08:  rgba(var(--cyan-rgb), .08);
+  --cyan-a10:  rgba(var(--cyan-rgb), .10);
+  --cyan-a12:  rgba(var(--cyan-rgb), .12);
+  --cyan-a15:  rgba(var(--cyan-rgb), .15);
+  --cyan-a18:  rgba(var(--cyan-rgb), .18);
+  --cyan-a40:  rgba(var(--cyan-rgb), .40);
+  --cyan-a53:  rgba(var(--cyan-rgb), .533); /* #00f5ff88 */
+
+  --purple-a12: rgba(var(--purple-rgb), .12);
+  --purple-a15: rgba(var(--purple-rgb), .15);
+  --purple-a18: rgba(var(--purple-rgb), .18);
+  --purple-a20: rgba(var(--purple-rgb), .20);
+  --purple-a25: rgba(var(--purple-rgb), .25);
+  --purple-a53: rgba(var(--purple-rgb), .533); /* #7c3aed88 */
+
+  --amber-a08: rgba(var(--amber-rgb), .08);
+  --amber-a12: rgba(var(--amber-rgb), .12);
+  --amber-a18: rgba(var(--amber-rgb), .18);
+  --amber-a20: rgba(var(--amber-rgb), .20);
+  --amber-a25: rgba(var(--amber-rgb), .25);
+
+  --danger-a08: rgba(var(--danger-rgb), .08);
+  --danger-a12: rgba(var(--danger-rgb), .12);
+  --danger-a18: rgba(var(--danger-rgb), .18);
+  --danger-a25: rgba(var(--danger-rgb), .25);
+
+  --green-a08: rgba(var(--green-rgb), .08);
+  --green-a12: rgba(var(--green-rgb), .12);
+  --green-a18: rgba(var(--green-rgb), .18);
+
+  --gold-a10: rgba(var(--gold-rgb), .10);
+
+  --white-a04: rgba(var(--white-rgb), .04);
+  --white-a06: rgba(var(--white-rgb), .06);
+  --black-a12: rgba(var(--black-rgb), .12);
 
   /* ── Glow shadows ── */
-  --glow-cyan:   0 0 8px rgba(0,245,255,.6), 0 0 24px rgba(0,245,255,.25);
-  --glow-purple: 0 0 8px rgba(124,58,237,.7), 0 0 24px rgba(124,58,237,.3);
-  --glow-amber:  0 0 8px rgba(245,158,11,.7), 0 0 24px rgba(245,158,11,.3);
+  --glow-cyan:    0 0 8px rgba(var(--cyan-rgb), .6), 0 0 24px rgba(var(--cyan-rgb), .25);
+  --glow-purple:  0 0 8px rgba(var(--purple-rgb), .7), 0 0 24px rgba(var(--purple-rgb), .3);
+  --glow-amber:   0 0 8px rgba(var(--amber-rgb), .7), 0 0 24px rgba(var(--amber-rgb), .3);
+  --glow-green:   0 0 6px rgb(var(--green-rgb));
+  --glow-dot-cyan:   0 0 4px rgb(var(--cyan-rgb));
+  --glow-dot-purple: 0 0 4px rgb(var(--purple-bright-rgb));
+  --glow-dot-amber:  0 0 4px rgb(var(--amber-rgb));
+  --glow-danger:  0 0 6px rgb(var(--danger-rgb));
+  --text-glow-cyan: 0 0 6px rgb(var(--cyan-rgb));
+
+  --shadow-cell-called: inset 0 0 8px var(--cyan-a15), var(--glow-cyan);
+  --shadow-cell-bingo:  inset 0 0 10px var(--amber-a20), var(--glow-amber);
+
+  /* Shared cyan/purple frame treatment */
+  --shadow-frame: 6px 6px 15px var(--purple-a20), -6px 6px 15px var(--purple-a20), inset 0 -2px 10px var(--cyan-a10);
+  --shadow-frame-edge: 6px 6px 15px var(--purple-a20), inset -2px -2px 10px var(--cyan-a10);
+  --shadow-frame-alert: 6px 6px 15px var(--purple-a25), -6px 6px 15px var(--purple-a25), inset 0 -2px 10px var(--cyan-a15);
+
+  /* ── Gradients ── */
+  --grad-alert-card: linear-gradient(135deg, var(--surface-a97) 0%, var(--elevated-a97) 100%);
+  --grad-shine:      linear-gradient(90deg, transparent, var(--white-a06), transparent);
+  --grad-shine-soft: linear-gradient(90deg, transparent, var(--white-a04), transparent);
+  --grad-chat-fade:  linear-gradient(to bottom, transparent 0%, var(--void-a00) 100%);
+  --grad-vignette:   radial-gradient(ellipse 90% 80% at 50% 50%, transparent 40%, var(--void-a85) 100%);
+  --grad-aurora:
+      radial-gradient(ellipse 60% 40% at 30% 60%, var(--purple-a18) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 35% at 70% 35%, var(--cyan-a12) 0%, transparent 70%);
+  --grad-called-sheen: linear-gradient(135deg, var(--cyan-a07) 0%, transparent 60%);
+  --grad-name-badge:   linear-gradient(90deg, var(--purple-dim), var(--surface));
+  --grad-hud-edge:     linear-gradient(90deg, transparent, var(--cyan), transparent);
+
+  --filter-hex-glow-from: drop-shadow(0 0 4px rgb(var(--purple-rgb))) drop-shadow(0 0 12px var(--purple-a53));
+  --filter-hex-glow-to:   drop-shadow(0 0 8px rgb(var(--cyan-rgb))) drop-shadow(0 0 20px var(--cyan-a53));
+
+  /* Fallback chat-name hue window (blue → purple → cyan). Shift for a seasonal palette. */
+  --user-hue-start: 180;
+  --user-hue-span:  300;
+  --user-sat: 70%;
+  --user-lit: 65%;
 
   /* ── Typography ── */
   --font-display: 'Orbitron', sans-serif;
@@ -74,8 +194,8 @@ html, body {
     to bottom,
     transparent 0px,
     transparent 3px,
-    rgba(0,0,0,.12) 3px,
-    rgba(0,0,0,.12) 4px
+    var(--black-a12) 3px,
+    var(--black-a12) 4px
   );
   pointer-events: none;
   z-index: 999;

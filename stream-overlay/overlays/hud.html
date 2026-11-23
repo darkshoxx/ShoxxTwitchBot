@@ -20,7 +20,7 @@
 
   /* ── Generic HUD widget ── */
   .hud-widget {
-    background: rgba(14,17,26,.80);
+    background: var(--hud-a80);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     padding: 8px 14px;
@@ -36,7 +36,7 @@
     content: '';
     position: absolute; top:0; left:0; right:0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    background: var(--grad-hud-edge);
     opacity: 0.4;
   }
 
@@ -58,8 +58,8 @@
     line-height: 1;
   }
   .hud-value.amber { color: var(--amber); }
-  .hud-value.purple { color: #c084fc; }
-  .hud-value.green  { color: #34d399; }
+  .hud-value.purple { color: var(--purple-bright); }
+  .hud-value.green  { color: var(--green); }
 
   /* ── Stream timer ── */
   #stream-time .hud-value { letter-spacing: .05em; font-variant-numeric: tabular-nums; }
@@ -166,7 +166,7 @@ setInterval(() => {
     spinAgoEl.style.color = 'var(--amber)';
   } else {
     spinAgoEl.textContent = 'READY';
-    spinAgoEl.style.color = 'var(--green, #34d399)';
+    spinAgoEl.style.color = 'var(--green)';
   }
 }, 500);
 

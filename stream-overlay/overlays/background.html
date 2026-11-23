@@ -15,11 +15,7 @@
   /* Radial vignette so edges blend into game capture */
   .vignette {
     position: fixed; inset: 0;
-    background: radial-gradient(
-      ellipse 90% 80% at 50% 50%,
-      transparent 40%,
-      rgba(13,15,20,.85) 100%
-    );
+    background: var(--grad-vignette);
     pointer-events: none;
     z-index: 2;
   }
@@ -28,9 +24,7 @@
   .aurora {
     position: fixed; inset: -20%;
     width: 140%; height: 140%;
-    background:
-      radial-gradient(ellipse 60% 40% at 30% 60%, rgba(124,58,237,.18) 0%, transparent 70%),
-      radial-gradient(ellipse 50% 35% at 70% 35%, rgba(0,245,255,.12) 0%, transparent 70%);
+    background: var(--grad-aurora);
     animation: auroraDrift 18s ease-in-out infinite alternate;
     z-index: 0;
     pointer-events: none;
@@ -51,6 +45,13 @@
 const canvas = document.getElementById('hex');
 const ctx    = canvas.getContext('2d');
 
+function channels(name) {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .split(',')
+    .map((n) => parseInt(n.trim(), 10));
+}
+
 // ── Config ────────────────────────────────────────────────
 const CFG = {
   hexSize:     38,       // circumradius (center → vertex); drives grid pitch AND draw size
@@ -66,10 +67,10 @@ const CFG = {
   scrollSpeedX: 0.18,   // px/frame rightward drift
   scrollSpeedY: 0.10,   // px/frame downward drift
   pulseSpeed:   0.008,  // glow pulse rate
-  colorA: [124, 58,  237],  // purple
-  colorB: [  0,245,  255],  // cyan
-  colorDim: [30, 40, 70],   // resting hex fill
-  bgColor: '#0d0f14',
+  colorA: channels('--purple-rgb'),
+  colorB: channels('--cyan-rgb'),
+  colorDim: channels('--hex-rest-rgb'),
+  bgColor: `rgb(${channels('--void-rgb').join(',')})`,
 };
 
 let W, H, cols, rows;

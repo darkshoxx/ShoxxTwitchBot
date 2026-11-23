@@ -24,7 +24,7 @@
     position: fixed;
     top: 0; left: 0; right: 0;
     height: 120px;
-    background: linear-gradient(to bottom, transparent 0%, rgba(13,15,20,.0) 100%);
+    background: var(--grad-chat-fade);
     pointer-events: none;
     z-index: 1;
   }
@@ -34,7 +34,7 @@
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    background: rgba(20,23,32,.82);
+    background: var(--surface-a82);
     border-left: 3px solid var(--user-color, var(--cyan));
     border-radius: 0 var(--r-sm) var(--r-sm) 0;
     padding: 6px 10px 6px 8px;
@@ -47,7 +47,7 @@
     content: '';
     position: absolute; top:0; left:-80%;
     width: 60%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,.04), transparent);
+    background: var(--grad-shine-soft);
     animation: msgShine 0.5s 0.1s ease-out both;
   }
   @keyframes msgShine {
@@ -118,7 +118,7 @@
 
   /* Broadcaster highlight */
   .msg.broadcaster {
-    background: rgba(124,58,237,.18);
+    background: var(--purple-a18);
     border-left-color: var(--purple);
   }
 </style>
@@ -138,13 +138,24 @@
 
 const wrap = document.getElementById('chat-wrap');
 const MAX_MESSAGES = 12;
+const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function cssColor(name) {
+  const probe = document.createElement('span');
+  probe.style.color = `var(${name})`;
+  document.body.appendChild(probe);
+  const color = getComputedStyle(probe).color;
+  probe.remove();
+  return color;
+}
 
 // Generate a stable color for users without one set
 function userColor(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
-  const hue = ((h >>> 0) % 300) + 180; // 180-480 maps to blue/purple/cyan range
-  return `hsl(${hue % 360}, 70%, 65%)`;
+  const start = parseFloat(token('--user-hue-start'));
+  const span = parseFloat(token('--user-hue-span'));
+  const hue = ((h >>> 0) % span) + start;
+  return `hsl(${hue % 360}, ${token('--user-sat')}, ${token('--user-lit')})`;
 }
 
 function addMessage({ user, text, color, badges = [], isHtml = false }) {
@@ -206,10 +217,10 @@ window.addEventListener('overlay:ban', e => {
 
 // ── Dev: seed a few demo messages on load ─────────────────
 const demos = [
-  { user: 'darkshoxx',  text: 'Chat overlay is live 🎮', color: '#7c3aed', badges: ['broadcaster'] },
-  // { user: 'CoolViewer', text: 'LUL that was amazing!!', color: '#00f5ff' },
-  // { user: 'MystFan99',  text: 'pokemon gen3 let\'s go!!', color: '#f59e0b' },
-  // { user: 'SpeedDemon', text: 'spin', color: '#34d399', badges: ['sub'] },
+  { user: 'darkshoxx',  text: 'Chat overlay is live 🎮', color: cssColor('--purple'), badges: ['broadcaster'] },
+  // { user: 'CoolViewer', text: 'LUL that was amazing!!', color: cssColor('--cyan') },
+  // { user: 'MystFan99',  text: 'pokemon gen3 let\'s go!!', color: cssColor('--amber') },
+  // { user: 'SpeedDemon', text: 'spin', color: cssColor('--green'), badges: ['sub'] },
 ];
 demos.forEach((d, i) => setTimeout(() => addMessage(d), i * 200));
 </script>

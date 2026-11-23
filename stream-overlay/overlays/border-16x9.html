@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>16:9 Game Border – darkshoxx</title>
+<link rel="stylesheet" href="/css/tokens.css">
 <style>
   /* 1920x1080 Canvas */
   html, body {
@@ -23,12 +24,11 @@
     height: 810px;
     box-sizing: border-box;
     
-    /* Styling to match your tokens */
-    border-right: 2px solid #00f5ff;
-    border-bottom: 2px solid #7c3aed;
-    border-left: 2px solid #00f5ff;
-    border-top: 2px solid #7c3aed;
-    box-shadow: 6px 6px 15px rgba(124, 58, 237, 0.2), inset -2px -2px 10px rgba(0, 245, 255, 0.1);
+    border-right: 2px solid var(--cyan);
+    border-bottom: 2px solid var(--purple);
+    border-left: 2px solid var(--cyan);
+    border-top: 2px solid var(--purple);
+    box-shadow: var(--shadow-frame-edge);
   }
 </style>
 </head>

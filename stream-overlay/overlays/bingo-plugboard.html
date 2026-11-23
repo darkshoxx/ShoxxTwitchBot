@@ -40,13 +40,13 @@
     transition: all .15s;
   }
   .btn:active { transform: scale(.97); }
-  .btn-danger  { background: rgba(239,68,68,.12); border-color: var(--danger); color: var(--danger); }
-  .btn-danger:hover  { background: rgba(239,68,68,.25); }
-  .btn-bingo   { background: rgba(245,158,11,.12); border-color: var(--amber); color: var(--amber); box-shadow: var(--glow-amber); }
-  .btn-bingo:hover   { background: rgba(245,158,11,.25); }
-  .btn-random  { background: rgba(124,58,237,.12); border-color: var(--purple); color: #c084fc; }
-  .btn-random:hover  { background: rgba(124,58,237,.25); }
-  .btn-reload  { background: rgba(0,245,255,.08); border-color: var(--border); color: var(--text-muted); }
+  .btn-danger  { background: var(--danger-a12); border-color: var(--danger); color: var(--danger); }
+  .btn-danger:hover  { background: var(--danger-a25); }
+  .btn-bingo   { background: var(--amber-a12); border-color: var(--amber); color: var(--amber); box-shadow: var(--glow-amber); }
+  .btn-bingo:hover   { background: var(--amber-a25); }
+  .btn-random  { background: var(--purple-a12); border-color: var(--purple); color: var(--purple-bright); }
+  .btn-random:hover  { background: var(--purple-a25); }
+  .btn-reload  { background: var(--cyan-a08); border-color: var(--border); color: var(--text-muted); }
   .btn-reload:hover  { border-color: var(--cyan); color: var(--cyan); }
 
   .random-controls {
@@ -89,7 +89,7 @@
   }
   .toggle-item:hover { border-color: var(--cyan); }
   .toggle-item.called {
-    background: rgba(0,245,255,.08);
+    background: var(--cyan-a08);
     border-color: var(--cyan);
     box-shadow: var(--glow-cyan);
   }

@@ -17,9 +17,9 @@
   }
   .q-dots { display:flex; gap:4px; align-items:center; }
   .q-dot  { width:6px; height:6px; border-radius:50%; }
-  .dot-wl { background:#00f5ff; box-shadow:0 0 4px #00f5ff; }
-  .dot-wt { background:#c084fc; box-shadow:0 0 4px #c084fc; }
-  .dot-us { background:#f59e0b; box-shadow:0 0 4px #f59e0b; }
+  .dot-wl { background:var(--cyan); box-shadow:var(--glow-dot-cyan); }
+  .dot-wt { background:var(--purple-bright); box-shadow:var(--glow-dot-purple); }
+  .dot-us { background:var(--amber); box-shadow:var(--glow-dot-amber); }
   .q-closed {
     font-family:var(--font-display); font-size:8px; font-weight:700;
     letter-spacing:.12em; text-transform:uppercase; color:var(--danger);
@@ -29,7 +29,7 @@
   .q-entry {
     display:flex; align-items:center; gap:10px;
     padding:8px 12px;
-    background:rgba(20,23,32,.80);
+    background:var(--surface-a80);
     border-left:3px solid var(--ec,var(--border));
     border-radius:0 var(--r-sm) var(--r-sm) 0;
     backdrop-filter:blur(6px);
@@ -42,7 +42,7 @@
     opacity:.5;
   }
   @keyframes eIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
-  .q-entry:first-of-type { background:rgba(20,23,32,.92); }
+  .q-entry:first-of-type { background:var(--surface-a92); }
 
   .q-pos {
     flex-shrink:0; width:20px; height:20px; border-radius:50%;
@@ -83,7 +83,15 @@
 </div>
 <script>
 const MAX_SHOW = 3;
-const COLORS = { weightless:'#00f5ff', weighted:'#c084fc', usual:'#f59e0b' };
+function cssColor(name) {
+  const probe = document.createElement('span');
+  probe.style.color = `var(${name})`;
+  document.body.appendChild(probe);
+  const color = getComputedStyle(probe).color;
+  probe.remove();
+  return color;
+}
+const COLORS = { weightless: cssColor('--cyan'), weighted: cssColor('--purple-bright'), usual: cssColor('--amber') };
 
 // Keep track of previous state to avoid unnecessary re-renders
 let lastRenderKey = '';

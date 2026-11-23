@@ -38,15 +38,15 @@
     display:flex; align-items:center; gap:8px;
   }
   .btn:active { transform:scale(.97); }
-  .btn-next    { background:rgba(0,245,255,.08); border-color:var(--cyan); color:var(--cyan); }
-  .btn-next:hover { background:rgba(0,245,255,.18); box-shadow:var(--glow-cyan); }
-  .btn-open    { background:rgba(52,211,153,.08); border-color:#34d399; color:#34d399; }
-  .btn-open:hover { background:rgba(52,211,153,.18); }
-  .btn-close   { background:rgba(239,68,68,.08); border-color:var(--danger); color:var(--danger); }
-  .btn-close:hover { background:rgba(239,68,68,.18); }
-  .btn-reload  { background:rgba(245,158,11,.08); border-color:var(--amber); color:var(--amber); }
-  .btn-reload:hover { background:rgba(245,158,11,.18); }
-  .btn-muted   { background:rgba(255,255,255,.04); border-color:var(--border); color:var(--text-muted); }
+  .btn-next    { background:var(--cyan-a08); border-color:var(--cyan); color:var(--cyan); }
+  .btn-next:hover { background:var(--cyan-a18); box-shadow:var(--glow-cyan); }
+  .btn-open    { background:var(--green-a08); border-color:var(--green); color:var(--green); }
+  .btn-open:hover { background:var(--green-a18); }
+  .btn-close   { background:var(--danger-a08); border-color:var(--danger); color:var(--danger); }
+  .btn-close:hover { background:var(--danger-a18); }
+  .btn-reload  { background:var(--amber-a08); border-color:var(--amber); color:var(--amber); }
+  .btn-reload:hover { background:var(--amber-a18); }
+  .btn-muted   { background:var(--white-a04); border-color:var(--border); color:var(--text-muted); }
   .btn-muted:hover { border-color:var(--cyan); color:var(--text); }
 
   /* ── Status box ── */
@@ -56,13 +56,13 @@
     font-family:var(--font-mono); font-size:11px; color:var(--text-muted);
     min-height:44px; line-height:1.5;
   }
-  #status-box.ok  { border-color:#34d399; color:#34d399; }
+  #status-box.ok  { border-color:var(--green); color:var(--green); }
   #status-box.err { border-color:var(--danger); color:var(--danger); }
 
   /* ── Queue state indicator ── */
   .q-state { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
   .q-state-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-  .q-state-dot.open   { background:#34d399; box-shadow:0 0 6px #34d399; }
+  .q-state-dot.open   { background:var(--green); box-shadow:var(--glow-green); }
   .q-state-dot.closed { background:var(--danger); }
   .q-state-label { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
 
@@ -136,7 +136,15 @@
 </div>
 
 <script>
-const COLORS = { weightless:'#00f5ff', weighted:'#c084fc', usual:'#f59e0b' };
+function cssColor(name) {
+  const probe = document.createElement('span');
+  probe.style.color = `var(${name})`;
+  document.body.appendChild(probe);
+  const color = getComputedStyle(probe).color;
+  probe.remove();
+  return color;
+}
+const COLORS = { weightless: cssColor('--cyan'), weighted: cssColor('--purple-bright'), usual: cssColor('--amber') };
 
 function entryColor(e) {
   if (e.type==='usual') return COLORS.usual;
